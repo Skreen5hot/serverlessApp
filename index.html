@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Serverless POC</title>
+    <script src="assets/third-party/js/sql-wasm.js"></script>
+
+    <script src="assets/js/db.js"></script>
+    <script src="assets/js/app.js"></script>
+</head>
+<body>
+    
+    <!-- sql -->
+    <div>
+        <h3>SQL Database</h3>
+        <label for="value">Create Entry:</label>
+        <input type="text" id="sql-value">
+        <div id="sql-create-notify"></div>
+        <br>
+        <button id="sql-create">
+            Create
+        </button>
+        <br><br>
+        <button id="sql-read">
+            Read Data
+        </button>
+
+        <div style="background-color: lightgray;" id="sql-results"></div>
+
+    </div>
+
+</body>
+</html>
