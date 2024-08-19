@@ -22,13 +22,34 @@ class SQLDB {
         const keys = Object.keys(value);
         const values = Object.values(value).map((val) => {
             if (typeof val === 'string') {
-                return `'${val}'`;
+                return this.quoteEscape(val);
             }
             return val;
         });
         this.query(`INSERT INTO ${tableName}(${keys.join(', ')}) VALUES (${values.join(',')})`);
         const item = this.queryObjects(`SELECT rowid, ${keys.join(', ')} FROM ${tableName} ORDER BY rowid DESC LIMIT 1`);
         return item[0];
+    }
+
+    // update given table name
+    // set values to given value (object) for given rowid
+    // returns true if a row is modified, false otherwise
+    // it returns true as long as given rowid exists, even if all values remained the same
+    update(tableName, rowid, value) {
+        const keys = Object.keys(value);
+        const setItems = keys.map((key) => {
+            if (key === 'rowid') {return null;}
+            const val = this.quoteEscape(value[key]);
+            return `${key} = ${val}`;
+        }).filter((item) => {return item !== null;})
+        this.SQL.run(`
+        UPDATE ${tableName}
+        SET
+            ${setItems.join(',\n')}
+        WHERE
+            rowid = ${rowid}
+        `);
+        return this.SQL.getRowsModified() > 0;
     }
 
     // given QueryExecResult, return array of objects
@@ -43,6 +64,20 @@ class SQLDB {
                 return prev;
             }, {});
         });
+    }
+
+    escape(str) {
+        if (typeof str === 'string') {
+            return str.replaceAll("'", '\\' + "'")
+        }
+        return str;
+    }
+
+    quoteEscape(str) {
+        if (typeof str === 'string') {
+            return `'${this.escape(str)}'`;
+        }
+        return str;
     }
 }
 

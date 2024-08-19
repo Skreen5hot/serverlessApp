@@ -17,6 +17,10 @@ class App {
         });
     }
 
+    SQLUpdateItem(rowid, value) {
+        return this.DB.update('storedValues', rowid, {value});
+    }
+
     SQLItems() {
         return this.DB.queryObjects('SELECT rowid, * FROM storedValues');
     }
@@ -28,13 +32,17 @@ class App {
         const SQLCreateNotify = document.querySelector('#sql-create-notify');
         const SQLReadBtn = document.querySelector('#sql-read');
         const SQLResults = document.querySelector('#sql-results');
+        const SQLEditID = document.querySelector('#sql-edit-id');
+        const SQLEditValue = document.querySelector('#sql-edit-value');
+        const SQLEditButton = document.querySelector('#sql-edit-button');
+        const SQLEditNotify = document.querySelector('#sql-edit-notify');
         SQLCreateBtn.addEventListener('click', () => {
             const item = this.SQLCreateItem(SQLCreateValue.value);
             SQLCreateValue.value = '';
             SQLCreateNotify.textContent = `Created item, item id ${item.rowid}`;
             setTimeout(() => {
                 SQLCreateNotify.textContent = '';
-            }, 2000);
+            }, 1500);
         });
 
         // read SQL DB
@@ -46,6 +54,18 @@ class App {
                 itemElement.textContent = item.rowid + ', ' + item.value;
                 SQLResults.appendChild(itemElement);
             });
+        });
+
+        // update SQL row
+        SQLEditButton.addEventListener('click', () => {
+            if (this.SQLUpdateItem(SQLEditID.value, SQLEditValue.value)) {
+                SQLEditNotify.textContent = 'Row updated';
+            } else {
+                SQLEditNotify.textContent = 'No rows updated';
+            }
+            setTimeout(() => {
+                SQLEditNotify.textContent = '';
+            }, 1500);
         });
     }
 }
