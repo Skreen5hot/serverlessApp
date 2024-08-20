@@ -18,7 +18,16 @@ class SQLDB {
     // value is an object representing the key->val pairs to be inserted
     // returns the created item as object
     // returned object always has a property rowid (autoincrement)
-    insert(tableName, value) {
+    async insert(tableName, value) {
+        // add field persisted = 0 to stored value, new values should have this
+        // so that once persist is called, we know which values should be persisted
+        if (!('persisted' in value)) {
+            value = Object.assign({
+                persisted: 0
+            }, value);
+        }
+
+        // prepare and store to in-memory SQL DB
         const keys = Object.keys(value);
         const values = Object.values(value).map((val) => {
             if (typeof val === 'string') {
@@ -27,6 +36,13 @@ class SQLDB {
             return val;
         });
         this.query(`INSERT INTO ${tableName}(${keys.join(', ')}) VALUES (${values.join(',')})`);
+
+        // persist data
+        if (value.persisted === 0) {
+            await this.persist(tableName);
+        }
+
+        // return just stored item (persisted field left out)
         const item = this.queryObjects(`SELECT rowid, ${keys.join(', ')} FROM ${tableName} ORDER BY rowid DESC LIMIT 1`);
         return item[0];
     }
@@ -35,7 +51,7 @@ class SQLDB {
     // set values to given value (object) for given rowid
     // returns true if a row is modified, false otherwise
     // it returns true as long as given rowid exists, even if all values remained the same
-    update(tableName, rowid, value) {
+    async update(tableName, rowid, value) {
         const keys = Object.keys(value);
         const setItems = keys.map((key) => {
             if (key === 'rowid') {return null;}
@@ -49,7 +65,17 @@ class SQLDB {
         WHERE
             rowid = ${rowid}
         `);
-        return this.SQL.getRowsModified() > 0;
+
+        const updated = this.SQL.getRowsModified() > 0;
+
+        if (updated) {
+            // update in persistent storage too
+            const db = new Dexie('localData');
+            await db.open();
+            await db.table(tableName).update(rowid, value);
+        }
+        
+        return updated;
     }
 
     // given QueryExecResult, return array of objects
@@ -64,6 +90,88 @@ class SQLDB {
                 return prev;
             }, {});
         });
+    }
+
+    // persist all not persisted values to indexedDB
+    async persist(tableName) {
+        const tableSchema = this.queryObjects(`PRAGMA table_info(${tableName});`);
+
+        const db = new Dexie('localSchemas');
+        db.version(2).stores({
+            tables: `
+            tableName,
+            schema
+            `
+        });
+
+        // store/update schema
+        await db.table('tables').put({
+            tableName,
+            schema: tableSchema
+        }, tableName);
+
+        const nonPersisted = this.queryObjects(`SELECT rowid, * FROM ${tableName} WHERE persisted = 0`);
+
+        if (nonPersisted.length > 0) {
+            const db = new Dexie('localData');
+
+            // use first non-persisted item to extract the table schema
+            const schema = Object.keys(nonPersisted[0]);
+    
+            const stores = {}
+            stores[tableName] = schema.join(',\n');
+            db.version(2).stores(stores);
+
+            await db[tableName].bulkPut(nonPersisted.map((nonPersistedItem) => {
+                return {
+                    ...nonPersistedItem,
+                    persisted: 1
+                }
+            }));
+        }
+    }
+
+    // load persisted data from indexedDB to in-memory SQL DB
+    async load() {
+        const databases = await Dexie.getDatabaseNames();
+        
+        if (! databases.includes('localSchemas')) {
+            // no stored schemas found, stop here
+            return;
+        }
+
+        // create tables and restore data
+        const dbSchemas = new Dexie('localSchemas');
+        await dbSchemas.open();
+        const dbData = new Dexie('localData');
+        await dbData.open();
+
+        const schemaTables = dbSchemas._storeNames;
+        const dataTables = dbData._storeNames;
+
+        for (let i = 0; i < schemaTables.length; i++) {
+            const tableName = schemaTables[i];
+            const table = dbSchemas.table(tableName);
+            table.each((tblIndexedDB) => {
+                this.createTable(tblIndexedDB.tableName, tblIndexedDB.schema);
+
+                if (dataTables.includes(tblIndexedDB.tableName)) {
+                    // we have stored data for this table, restore it
+                    dbData.table(tblIndexedDB.tableName).each((row) => {
+                        this.insert(tblIndexedDB.tableName, row);
+                    });
+                }
+            });
+        }
+    }
+
+    // table only created if it does not already exist
+    // fields is an array of objects [ { name, type }, ... ]
+    createTable(tableName, fields) {
+        if (fields.length === 0) {return;}
+        // add field "persisted" INT
+        fields.push({name: 'persisted', type: 'INT'});
+        this.query(`CREATE TABLE IF NOT EXISTS ${tableName}(${fields.reduce((prev, curr) => {return `${prev}, ${curr.name} ${curr.type}`;}, '').substring(2)})`);
     }
 
     escape(str) {
