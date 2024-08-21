@@ -82,6 +82,7 @@ class SQLDB {
     // ignores all but the first item in QueryExecResult
     // as it is intended to be used for a single query results
     resultToObjects(result) {
+        if (result.length === 0) {return [];}
         const resFirst = result[0];
         return resFirst.values.map((res) => {
             return res.reduce((prev, val, index) => {
