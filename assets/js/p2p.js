@@ -1,18 +1,46 @@
 // peer to peer communication layer
-
 class P2P {
 
+    signalingServerURL = 'http://localhost:3888';
     localPeerConnection = null; // null or RTCPeerConnection
-    ready = false; // ready once peer to peer connection is estabilished
 
     dataChannel = null; // null or RTCDataChannel
 
+    socket = new io(this.signalingServerURL);
+
+    // unique user id used for signaling in order to ignore own messages
+    userId = Math.round(Math.random() * 1000000);
+
+    constructor() {
+        this.initPeer();
+        // offer received from signaling server, accept and send answer
+        this.socket.on('receive-offer', async (data) => {
+            if (data.userId !== this.userId) {
+                await this.acceptOffer(data.offer.sdp);
+            }
+        });
+
+        // answer received from signalign server, accept
+        this.socket.on('receive-answer', async (data) => {
+            if (data.userId !== this.userId) {
+                await this.acceptAnswer(data.answer.sdp);
+            }
+        });
+
+        // ICE candidate received from signalign server, add it
+        this.socket.on('receive-ice-candidate', async (data) => {
+            if (data.userId !== this.userId) {
+                this.localPeerConnection.addIceCandidate(data.candidate);
+            }
+        });
+    }
+
     initPeer() {
         const stunServers = [
+            { urls: 'stun:23.21.150.121:3478' },
             { urls: 'stun:stun.l.google.com:19302' },
             { urls: 'stun:stun1.l.google.com:19302' },
             { urls: 'stun:stun2.l.google.com:19302' },
-            { urls: 'stun:23.21.150.121:3478' },
         ];
 
         // create peer connection
@@ -20,26 +48,43 @@ class P2P {
             iceServers: stunServers
         });
 
+        // data channel created (by local or remote peer)
+        this.localPeerConnection.addEventListener('datachannel', (channel) => {
+            channel.channel.addEventListener('message', (msg) => {
+                console.log(msg);
+            });
+        });
+
+        // received ICE candidate for local peer, send to signalign server to broadcast
+        this.localPeerConnection.addEventListener('icecandidate', (ice) => {
+            if (ice.candidate) {
+                this.socket.emit('send-ice-candidate', {
+                    userId: this.userId,
+                    candidate: ice.candidate
+                });
+            }
+        });
+
         // create data channel
-        this.localPeerConnection.addEventListener('connectionstatechange', (state) => {
-            console.log('connection state', state);
-        });
         this.dataChannel = this.localPeerConnection.createDataChannel('messages');
-        this.dataChannel.addEventListener('message', (msg) => {
-            console.log(msg);
-        });
     }
 
     // create peer connection offer, used by peer initializing the coomunication
     async createOffer() {
-        this.ready = false;
-        this.initPeer();
         try {
-            // create offer
+            // create offer and set it as local description
             const offer = await this.localPeerConnection.createOffer();
             await this.localPeerConnection.setLocalDescription(offer);
 
-            // return offer
+            console.log('created offer')
+
+            // send offer to signaling server
+            this.socket.emit('send-offer', {
+                userId: this.userId,
+                offer
+            });
+
+            // return the offer
             return offer;
         } catch (error) {
             throw new Error("Error creating offer:" + error);
@@ -48,7 +93,7 @@ class P2P {
 
     // accept incoming offer from remote peer, used by peer receiving the connection
     async acceptOffer(sdp) {
-        this.initPeer();
+        // this.initPeer();
 
         const offer = new RTCSessionDescription({
             type: 'offer',
@@ -62,11 +107,17 @@ class P2P {
             alert(e);
         }
 
-        // create answer
+        // create answer and set it as local description
         const answer = await this.localPeerConnection.createAnswer();
         await this.localPeerConnection.setLocalDescription(answer);
 
-        this.ready = true;
+        console.log('offer accepted')
+
+        // send answer to signalign server
+        this.socket.emit('send-answer', {
+            userId: this.userId,
+            answer
+        });
 
         // return answer
         return answer;
@@ -82,15 +133,18 @@ class P2P {
             sdp: `${sdp}`
         });
         this.localPeerConnection.setRemoteDescription(offer);
-        this.ready = true;
+        console.log('answer accepted');
     }
 
+    // send a message to connected peers
     send(message) {
-        if (this.localPeerConnection === null || ! this.ready) {
+        if (this.localPeerConnection === null) {
             alert('P2P connection not open');
         }
         if (this.dataChannel !== null) {
             this.dataChannel.send(message);
+        } else {
+            console.log('data channel not initialized')
         }
     }
 
