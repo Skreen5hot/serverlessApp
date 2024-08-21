@@ -57,16 +57,11 @@ class App {
 
         // P2P
         const p2pInit = document.querySelector('#p2p-init');
-        const p2pTest = document.querySelector('#p2p-test');
 
         // init peer connection
         p2pInit.addEventListener('click', () => {
             p2pInit.disabled = true;
             p2p.createOffer();
-        });
-
-        p2pTest.addEventListener('click', () => {
-            p2p.send('hello!');
         });
 
         // received a message/action from peer, execute action
