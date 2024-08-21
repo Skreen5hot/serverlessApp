@@ -15,13 +15,30 @@ class App {
     }
 
     // add an item to in-memory SQL DB
-    async SQLCreateItem(value) {
+    async SQLCreateItem(value, notifyPeers = true) {
+        if (notifyPeers) {
+            // notify connected peers
+            p2p.send({
+                action: 'SQLCreate',
+                value
+            });
+        }
+        
         return await this.DB.insert('storedValues', {
             value
         });
     }
 
-    async SQLUpdateItem(rowid, value) {
+    async SQLUpdateItem(rowid, value, notifyPeers = true) {
+        if (notifyPeers) {
+            // notify connected peers
+            p2p.send({
+                action: 'SQLUpdate',
+                rowid,
+                value
+            });
+        }
+                
         return this.DB.update('storedValues', rowid, {value});
     }
 
@@ -51,6 +68,17 @@ class App {
         p2pTest.addEventListener('click', () => {
             p2p.send('hello!');
         });
+
+        // received a message/action from peer, execute action
+        p2p.onmessage = (msg) => {
+            if (msg.action === 'SQLCreate') {
+                this.SQLCreateItem(msg.value, false);
+            } else if (msg.action === 'SQLUpdate') {
+                this.SQLUpdateItem(msg.rowid, msg.value, false);
+            } else {
+                console.log('unrecognized p2p message', msg);
+            }
+        }
 
         // SQL-related
 
