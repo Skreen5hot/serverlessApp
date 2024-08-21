@@ -8,8 +8,17 @@ class P2P {
     dataChannel = null; // null or RTCDataChannel
 
     initPeer() {
+        const stunServers = [
+            { urls: 'stun:stun.l.google.com:19302' },
+            { urls: 'stun:stun1.l.google.com:19302' },
+            { urls: 'stun:stun2.l.google.com:19302' },
+            { urls: 'stun:23.21.150.121:3478' },
+        ];
+
         // create peer connection
-        this.localPeerConnection = new RTCPeerConnection();
+        this.localPeerConnection = new RTCPeerConnection({
+            iceServers: stunServers
+        });
 
         // create data channel
         this.localPeerConnection.addEventListener('connectionstatechange', (state) => {
