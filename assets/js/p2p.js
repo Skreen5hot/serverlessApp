@@ -11,6 +11,8 @@ class P2P {
     // unique user id used for signaling in order to ignore own messages
     userId = Math.round(Math.random() * 1000000);
 
+    onmessage = null; // if a function is assigned, it will be called whenever a message is received from peers
+
     constructor() {
         this.initPeer();
         // offer received from signaling server, accept and send answer
@@ -52,6 +54,9 @@ class P2P {
         this.localPeerConnection.addEventListener('datachannel', (channel) => {
             channel.channel.addEventListener('message', (msg) => {
                 console.log(msg);
+                if (typeof this.onmessage === 'function') {
+                    this.onmessage(JSON.parse(msg.data));
+                }
             });
         });
 
@@ -142,7 +147,7 @@ class P2P {
             alert('P2P connection not open');
         }
         if (this.dataChannel !== null) {
-            this.dataChannel.send(message);
+            this.dataChannel.send(typeof message === 'string' ? message : JSON.stringify(message));
         } else {
             console.log('data channel not initialized')
         }
