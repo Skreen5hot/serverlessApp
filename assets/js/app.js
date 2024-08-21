@@ -43,6 +43,7 @@ class App {
         const p2pAccept = document.querySelector('#p2p-accept');
         const p2psdp = document.querySelector('#p2p-sdp');
         const p2pControls = document.querySelector('#p2p-controls');
+        const p2pTest = document.querySelector('#p2p-test');
 
         // init peer connection
         p2pInit.addEventListener('click', async () => {
@@ -77,10 +78,10 @@ class App {
                 p2pControls.removeChild(answerSDPInput);
             });
             p2pControls.appendChild(answerSDPInput);
+        });
 
-            setInterval(() => {
-                p2p.send('hello!')
-            }, 5000);
+        p2pTest.addEventListener('click', () => {
+            p2p.send('hello!');
         });
 
 
