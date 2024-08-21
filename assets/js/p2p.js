@@ -146,7 +146,7 @@ class P2P {
         if (this.localPeerConnection === null) {
             alert('P2P connection not open');
         }
-        if (this.dataChannel !== null) {
+        if (this.dataChannel !== null && this.dataChannel.readyState === 'open') {
             this.dataChannel.send(typeof message === 'string' ? message : JSON.stringify(message));
         } else {
             console.log('data channel not initialized')
