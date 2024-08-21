@@ -40,50 +40,17 @@ class App {
 
         // P2P
         const p2pInit = document.querySelector('#p2p-init');
-        const p2pAccept = document.querySelector('#p2p-accept');
-        const p2psdp = document.querySelector('#p2p-sdp');
-        const p2pControls = document.querySelector('#p2p-controls');
         const p2pTest = document.querySelector('#p2p-test');
 
         // init peer connection
-        p2pInit.addEventListener('click', async () => {
+        p2pInit.addEventListener('click', () => {
             p2pInit.disabled = true;
-            try {
-                const offer = await p2p.createOffer();
-                p2psdp.textContent = offer.sdp;
-                // copy sdp to clipboard
-                await this.copyToClipboard(offer.sdp);
-                alert('Offer SDP copied to clipboard');
-                const answerSDPInput = document.createElement('textarea');
-                answerSDPInput.placeholder = 'Enter answer SDP';
-                answerSDPInput.addEventListener('input', async () => {
-                    await p2p.acceptAnswer(answerSDPInput.value);
-                    p2pControls.removeChild(answerSDPInput);
-                });
-                p2pControls.appendChild(answerSDPInput);
-            } catch (e) {
-                alert(e);
-            }
-        });
-
-        // accept peer connection
-        p2pAccept.addEventListener('click', async () => {
-            const answerSDPInput = document.createElement('textarea');
-            answerSDPInput.placeholder = 'Enter SDP';
-            answerSDPInput.addEventListener('input', async () => {
-                const answer = await p2p.acceptOffer(answerSDPInput.value);
-                p2psdp.textContent = answer.sdp;
-                await this.copyToClipboard(answer.sdp);
-                alert('Answer SDP copied to clipboard');
-                p2pControls.removeChild(answerSDPInput);
-            });
-            p2pControls.appendChild(answerSDPInput);
+            p2p.createOffer();
         });
 
         p2pTest.addEventListener('click', () => {
             p2p.send('hello!');
         });
-
 
         // SQL-related
 
