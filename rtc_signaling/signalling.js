@@ -1,7 +1,18 @@
 const PORT = 3888;
+const CERT = '/etc/letsencrypt/live/signal.filonexus.com/fullchain.pem';
+const CERT_KEY = '/etc/letsencrypt/live/signal.filonexus.com/privkey.pem';
 
-const http = require('http');
-const server = http.createServer();
+const https = require('https');
+const fs = require('fs');
+
+const certExists = fs.existsSync(CERT) && fs.existsSync(CERT_KEY);
+    
+const options = certExists ? {
+    cert: fs.readFileSync(CERT),
+    key: fs.readFileSync(CERT_KEY)
+} : {};
+
+const server = https.createServer(options);
 
 server.on('request', (req, res) => {
     res.setHeader('Access-Control-Allow-Origin', '*');
