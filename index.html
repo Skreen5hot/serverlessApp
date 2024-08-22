@@ -6,9 +6,11 @@
     <title>Serverless POC</title>
     <script src="assets/third-party/js/sql-wasm.js"></script>
     <script src="assets/third-party/js/dexie.js"></script>
+    <script src="assets/third-party/js/rdflib.min.js"></script>
     <script src="assets/third-party/js/socketio.js"></script>
 
     <script src="assets/js/db.js"></script>
+    <script src="assets/js/rdf.js"></script>
     <script src="assets/js/p2p.js"></script>
     <script src="assets/js/app.js"></script>
 </head>
@@ -45,6 +47,54 @@
         <div id="sql-edit-notify"></div>
         <button id="sql-edit-button">
             Edit
+        </button>
+
+    </div>
+
+    <!-- rdf -->
+    <div>
+        <h3>RDF Database</h3>
+        <div>
+            <label for="subject">Subject:</label>
+            <input type="text" id="subject">
+        </div>
+        <div>
+            <label for="predicate">Predicate:</label>
+            <input type="text" id="predicate">
+        </div>
+        <div>
+            <label for="object">Object:</label>
+            <input type="text" id="object">
+        </div>
+        <br>
+        <button id="rdf-create">
+            Create Tripe
+        </button>
+        <br><br>
+        <button id="rdf-read">
+            Read Triples
+        </button>
+
+        <div style="background-color: lightgray;">
+            <table id="rdf-results"></table>
+        </div>
+        <br>
+
+        <div>
+            <label for="edit-subject">Subject:</label>
+            <input type="text" id="edit-subject">
+        </div>
+        <div>
+            <label for="edit-predicate">Predicate:</label>
+            <input type="text" id="edit-predicate">
+        </div>
+        <div>
+            <label for="edit-object">Object:</label>
+            <input type="text" id="edit-object">
+        </div>
+        <br>
+        <button id="rdf-edit">
+            Edit Tripe
         </button>
 
     </div>

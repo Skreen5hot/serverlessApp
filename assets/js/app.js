@@ -2,6 +2,7 @@ class App {
     async init() {
         // create an instance of SQLDB, which is a wrapper around SQL.js
         this.DB = await createSQLDB();
+        this.RDF = new RDF();
 
         await this.DB.load();
 
@@ -44,6 +45,10 @@ class App {
 
     SQLItems() {
         return this.DB.queryObjects('SELECT rowid, * FROM storedValues');
+    }
+
+    RDFAdd(s, p, o) {
+        this.RDF.tripleAdd(s, p, o);
     }
 
     async copyToClipboard(text) {
@@ -117,6 +122,39 @@ class App {
             setTimeout(() => {
                 SQLEditNotify.textContent = '';
             }, 1500);
+        });
+
+        // RDF
+        const rdfSubject = document.querySelector('#subject');
+        const rdfPredicate = document.querySelector('#predicate');
+        const rdfObject = document.querySelector('#object');
+        const rdfAdd = document.querySelector('#rdf-create');
+        const rdfRead = document.querySelector('#rdf-read');
+        const rdfResults = document.querySelector('#rdf-results');
+
+        rdfAdd.addEventListener('click', () => {
+            const s = rdfSubject.value;
+            const p = rdfPredicate.value;
+            const o = rdfObject.value;
+            this.RDFAdd(s, p, o);
+        });
+
+        rdfRead.addEventListener('click', () => {
+            rdfResults.innerHTML = `<tr>
+                <th>Subject</th>
+                <th>Predicate</th>
+                <th>Object</th>
+            </tr>`;
+            const triples = this.RDF.triples();
+            triples.forEach((triple) => {
+                const row = document.createElement('tr');
+                for (let i = 0; i < 3; i++) {
+                    const cell = document.createElement('td');
+                    cell.textContent = triple[i].value;
+                    row.appendChild(cell);
+                }
+                rdfResults.appendChild(row);
+            });
         });
     }
 }
