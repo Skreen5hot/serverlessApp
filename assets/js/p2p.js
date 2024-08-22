@@ -1,7 +1,7 @@
 // peer to peer communication layer
 class P2P {
 
-    signalingServerURL = 'https://signal.filonexus.com';
+    signalingServerURL = 'wss://signal.filonexus.com';
     // signalingServerURL = 'http://localhost:3888';
     localPeerConnection = null; // null or RTCPeerConnection
 
