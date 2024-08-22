@@ -1,7 +1,8 @@
 // peer to peer communication layer
 class P2P {
 
-    signalingServerURL = 'http://fandaws.com:3888';
+    signalingServerURL = 'https://dev.fandaws.com:3888';
+    // signalingServerURL = 'http://localhost:3888';
     localPeerConnection = null; // null or RTCPeerConnection
 
     dataChannel = null; // null or RTCDataChannel
