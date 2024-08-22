@@ -5,6 +5,8 @@ const server = http.createServer();
 
 server.on('request', (req, res) => {
     res.setHeader('Access-Control-Allow-Origin', '*');
+    res.write('RTC signaling server');
+    res.end();
 });
 
 const io = require('socket.io')(server, {
