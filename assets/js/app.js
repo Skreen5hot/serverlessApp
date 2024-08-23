@@ -47,8 +47,8 @@ class App {
         return this.DB.queryObjects('SELECT rowid, * FROM storedValues');
     }
 
-    RDFAdd(s, p, o) {
-        this.RDF.tripleAdd(s, p, o);
+    async RDFAdd(s, p, o) {
+        await this.RDF.tripleAdd(s, p, o);
     }
 
     async copyToClipboard(text) {
