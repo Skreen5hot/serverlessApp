@@ -140,12 +140,21 @@ class App {
         });
 
         rdfRead.addEventListener('click', () => {
+
+            const s = rdfSubject.value.trim();
+            const p = rdfPredicate.value.trim();
+            const o = rdfObject.value.trim();
+
             rdfResults.innerHTML = `<tr>
                 <th>Subject</th>
                 <th>Predicate</th>
                 <th>Object</th>
             </tr>`;
-            const triples = this.RDF.triples();
+            const triples = this.RDF.triples(
+                s.length > 0 ? s : undefined,
+                p.length > 0 ? p : undefined,
+                o.length > 0 ? o : undefined
+            );
             triples.forEach((triple) => {
                 const row = document.createElement('tr');
                 for (let i = 0; i < 3; i++) {
