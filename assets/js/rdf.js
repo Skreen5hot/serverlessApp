@@ -27,9 +27,9 @@ class RDF {
     triples(s, p, o) {
         const triples = [];
         const statements = this.graph.statementsMatching(
-            typeof s === 'string' ? this.createNode(s) : undefined,
-            typeof p === 'string' ? this.createNode(p) : undefined,
-            typeof o === 'string' ? this.createNode(o) : undefined
+            typeof s === 'string' && s.trim().length > 0 ? this.createNode(s) : undefined,
+            typeof p === 'string' && p.trim().length ? this.createNode(p) : undefined,
+            typeof o === 'string' && o.trim().length ? this.createNode(o) : undefined
         );
         statements.forEach((statement) => {
             triples.push([
