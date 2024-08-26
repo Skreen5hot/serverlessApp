@@ -42,6 +42,24 @@ class RDF {
         return triples;
     }
 
+    async setObject(s, p, newO) {
+        const sNode = typeof s === 'string' ? this.createNode(s) : undefined;
+        const pNode = typeof p === 'string' ? this.createNode(p) : undefined;
+        const statements = this.graph.statementsMatching(
+            sNode,
+            pNode,
+            undefined
+        );
+
+        if (statements.length === 0) {
+            throw new Error('Cant update object for given S+P, no triple found');
+        }
+
+        this.graph.removeMany(sNode, pNode);
+        this.graph.add(sNode, pNode, this.createNode(newO));
+        await this.persist();
+    }
+
     isURI(str) {
         return str.indexOf('http') === 0;
     }

@@ -128,9 +128,13 @@ class App {
         const rdfSubject = document.querySelector('#subject');
         const rdfPredicate = document.querySelector('#predicate');
         const rdfObject = document.querySelector('#object');
+        const rdfSubjectEdit = document.querySelector('#edit-subject');
+        const rdfPredicateEdit = document.querySelector('#edit-predicate');
+        const rdfObjectEdit = document.querySelector('#edit-object');
         const rdfAdd = document.querySelector('#rdf-create');
         const rdfRead = document.querySelector('#rdf-read');
         const rdfResults = document.querySelector('#rdf-results');
+        const rdfEdit = document.querySelector('#rdf-edit');
 
         rdfAdd.addEventListener('click', () => {
             const s = rdfSubject.value;
@@ -164,6 +168,15 @@ class App {
                 }
                 rdfResults.appendChild(row);
             });
+        });
+
+        rdfEdit.addEventListener('click', () => {
+            const s = rdfSubjectEdit.value.trim();
+            const p = rdfPredicateEdit.value.trim();
+            const o = rdfObjectEdit.value.trim();
+            if (s.length > 0 && p.length > 0) {
+                this.RDF.setObject(s, p, o);
+            }
         });
     }
 }
