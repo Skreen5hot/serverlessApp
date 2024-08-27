@@ -92,6 +92,7 @@ class App {
         const SQLEditValue = document.querySelector('#sql-edit-value');
         const SQLEditButton = document.querySelector('#sql-edit-button');
         const SQLEditNotify = document.querySelector('#sql-edit-notify');
+        const SQLImportFile = document.querySelector('#sql-import');
         SQLCreateBtn.addEventListener('click', async () => {
             const item = await this.SQLCreateItem(SQLCreateValue.value);
             SQLCreateValue.value = '';
@@ -122,6 +123,17 @@ class App {
             setTimeout(() => {
                 SQLEditNotify.textContent = '';
             }, 1500);
+        });
+
+        SQLImportFile.addEventListener('change', async () => {
+            const data = await CSV.fetch({
+                file: SQLImportFile.files[0]
+            });
+            if ('records' in data) {
+                data.records.forEach((row) => {
+                    this.SQLCreateItem(row[0]);
+                });
+            }
         });
 
         // RDF
