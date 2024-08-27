@@ -129,6 +129,30 @@ class SQLDB {
                     persisted: 1
                 }
             }));
+
+            // set all DB items as persisted
+            await this.query(`UPDATE ${tableName} SET persisted = 1`);
+        }
+
+        // delete persisted items no longer in the DB
+        const dbData = new Dexie('localData');
+        await dbData.open();
+        const totalIndexedDB = await dbData.table(tableName).count();
+        const totalSQL = this.queryObjects(`SELECT COUNT(*) AS total FROM ${tableName}`)[0].total;
+        if (totalIndexedDB > totalSQL) {
+            // there are indexedDB entries no longer in the SQL DB
+            const deleteRowids = [];
+            await dbData.table(tableName).each((row) => {
+                const inSQL = this.queryObjects(`SELECT COUNT(*) AS total FROM ${tableName} WHERE rowid = ${row.rowid}`)[0];
+                if (inSQL.total === 0) {
+                    // not in SQL, delete from indexedDB
+                    deleteRowids.push(row.rowid);
+                }
+            });
+
+            if (deleteRowids.length > 0) {
+                await dbData.table(tableName).where('rowid').anyOf(...deleteRowids).delete();
+            }
         }
     }
 

@@ -93,6 +93,8 @@ class App {
         const SQLEditButton = document.querySelector('#sql-edit-button');
         const SQLEditNotify = document.querySelector('#sql-edit-notify');
         const SQLImportFile = document.querySelector('#sql-import');
+        const SQLDelete = document.querySelector('#sql-delete');
+
         SQLCreateBtn.addEventListener('click', async () => {
             const item = await this.SQLCreateItem(SQLCreateValue.value);
             SQLCreateValue.value = '';
@@ -134,6 +136,13 @@ class App {
                     const row = data.records[i];
                     await this.SQLCreateItem(row[0]);
                 }
+            }
+        });
+
+        SQLDelete.addEventListener('click', async () => {
+            if (confirm('Are you sure you want to delete all SQL data?')) {
+                await this.DB.query('DELETE FROM storedValues');
+                await this.DB.persist('storedValues');
             }
         });
 
