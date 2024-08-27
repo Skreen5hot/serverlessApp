@@ -130,9 +130,10 @@ class App {
                 file: SQLImportFile.files[0]
             });
             if ('records' in data) {
-                data.records.forEach((row) => {
-                    this.SQLCreateItem(row[0]);
-                });
+                for (let i = 0; i < data.records.length; i++) {
+                    const row = data.records[i];
+                    await this.SQLCreateItem(row[0]);
+                }
             }
         });
 
