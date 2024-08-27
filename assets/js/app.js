@@ -147,6 +147,7 @@ class App {
         const rdfRead = document.querySelector('#rdf-read');
         const rdfResults = document.querySelector('#rdf-results');
         const rdfEdit = document.querySelector('#rdf-edit');
+        const rdfImport = document.querySelector('#rdf-import');
 
         rdfAdd.addEventListener('click', () => {
             const s = rdfSubject.value;
@@ -189,6 +190,20 @@ class App {
             if (s.length > 0 && p.length > 0) {
                 this.RDF.setObject(s, p, o);
             }
+        });
+
+        rdfImport.addEventListener('change', () => {
+            const store = $rdf.graph();
+            const reader = new FileReader();
+            reader.onload = async () => {
+                $rdf.parse(reader.result, store, 'http://example.org/');
+                const statements = store.statementsMatching();
+                for (let i = 0; i < statements.length; i++) {
+                    const statement = statements[i];
+                    await this.RDFAdd(statement.subject.value, statement.predicate.value, statement.object.value);
+                }
+            }
+            reader.readAsText(rdfImport.files[0]);
         });
     }
 }
