@@ -64,6 +64,18 @@ class RDF {
         return str.indexOf('http') === 0;
     }
 
+    async truncate() {
+        const triples = this.triples();
+        triples.forEach((triple) => {
+            this.graph.removeMatches(
+                triple.subject,
+                triple.predicate,
+                triple.object
+            );
+        });
+        await this.persist();
+    }
+
     // persist data to indexed DB
     async persist() {
         const db = new Dexie('rdf');

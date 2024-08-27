@@ -158,6 +158,7 @@ class App {
         const rdfResults = document.querySelector('#rdf-results');
         const rdfEdit = document.querySelector('#rdf-edit');
         const rdfImport = document.querySelector('#rdf-import');
+        const rdfDelete = document.querySelector('#rdf-delete');
 
         rdfAdd.addEventListener('click', () => {
             const s = rdfSubject.value;
@@ -214,6 +215,12 @@ class App {
                 }
             }
             reader.readAsText(rdfImport.files[0]);
+        });
+
+        rdfDelete.addEventListener('click', async () => {
+            if (confirm('Are you sure you want to delete all RDF data?')) {
+                await this.RDF.truncate();
+            }
         });
     }
 }
