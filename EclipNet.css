@@ -93,6 +93,9 @@ body {
     padding: 4px 8px;
     margin-bottom: 5px; /* Add some space below it */
     transition: background-color 0.3s, color 0.3s;
+        position: absolute;
+    top: 0;
+    right: 0;
 }
 
 #p2p-init.connected {
