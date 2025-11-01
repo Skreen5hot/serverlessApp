@@ -99,6 +99,9 @@ body {
     background-color: #00FF00;
     color: #000;
     animation: pulse 1.5s infinite;
+        position: absolute;
+    top: 0;
+    right: 0;
 }
 
 @keyframes pulse {
