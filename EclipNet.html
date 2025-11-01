@@ -245,14 +245,24 @@
                     });
 
                     // Monitor data channel state
+                    let lastState = '';
                     const monitorDataChannel = () => {
                         if (p2p.dataChannel) {
-                            output.textContent += `\n[System] Data channel state: ${p2p.dataChannel.readyState}\n`;
-                            scrollToBottom();
+                            const currentState = p2p.dataChannel.readyState;
+                            if (currentState !== lastState) {
+                                output.textContent += `\n[System] Data channel state: ${currentState}\n`;
+                                scrollToBottom();
+                                lastState = currentState;
+                            }
                         }
                     };
 
-                    setInterval(monitorDataChannel, 1000);
+                    const monitorInterval = setInterval(monitorDataChannel, 1000);
+                    
+                    // Clean up interval when page is unloaded
+                    window.addEventListener('unload', () => {
+                        clearInterval(monitorInterval);
+                    });
 
                     await p2p.createOffer();
                     output.textContent += '\n[System] Offer sent. Waiting for peer...\n';

@@ -68,8 +68,8 @@ class P2P {
                 { urls: 'stun:stun1.l.google.com:19302' }
             ],
             iceTransportPolicy: 'all',
-            iceCandidatePoolSize: 10,
-            bundlePolicy: 'max-bundle',
+            iceCandidatePoolSize: 0,
+            bundlePolicy: 'balanced',
             rtcpMuxPolicy: 'require'
         };
 
@@ -77,6 +77,7 @@ class P2P {
         this.isInitiator = false;
         this.isConnected = false;
         this.pendingCandidates = [];
+        this.dataChannel = null;
         
         // create peer connection
         this.localPeerConnection = new RTCPeerConnection(config);
@@ -101,19 +102,9 @@ class P2P {
         // Handle incoming data channels
         this.localPeerConnection.addEventListener('datachannel', (event) => {
             console.log('Received remote data channel');
-            this.dataChannel = event.channel;
-            this.setupDataChannelHandlers(this.dataChannel);
-        });
-
-        // Handle negotiation needed
-        this.localPeerConnection.addEventListener('negotiationneeded', async () => {
-            console.log('Negotiation needed event fired');
-            if (this.isInitiator) {
-                try {
-                    await this.createOffer();
-                } catch (e) {
-                    console.error('Error during negotiation:', e);
-                }
+            if (!this.dataChannel || this.dataChannel.readyState !== 'open') {
+                this.dataChannel = event.channel;
+                this.setupDataChannelHandlers(this.dataChannel);
             }
         });
 
@@ -127,13 +118,12 @@ class P2P {
             }
         });
 
-        // create data channel for the initiator
-        if (!this.dataChannel) {
-            this.dataChannel = this.localPeerConnection.createDataChannel('messages', {
-                ordered: true,
-                negotiated: false,
-                id: null
-            });
+        // Only create data channel if we're the initiator
+        if (this.isInitiator && !this.dataChannel) {
+            const dataChannelConfig = {
+                ordered: true
+            };
+            this.dataChannel = this.localPeerConnection.createDataChannel('messages', dataChannelConfig);
             console.log('Created local data channel');
             this.setupDataChannelHandlers(this.dataChannel);
         }
@@ -141,16 +131,29 @@ class P2P {
 
     async waitForDataChannel() {
         return new Promise((resolve) => {
-            if (this.dataChannel && this.dataChannel.readyState === 'open') {
-                resolve();
-            } else {
-                const checkInterval = setInterval(() => {
-                    if (this.dataChannel && this.dataChannel.readyState === 'open') {
-                        clearInterval(checkInterval);
-                        resolve();
+            const check = () => {
+                if (this.dataChannel && this.dataChannel.readyState === 'open') {
+                    console.log('Data channel is ready');
+                    resolve();
+                    return true;
+                }
+                return false;
+            };
+
+            if (check()) return;
+
+            const maxAttempts = 50; // 5 seconds
+            let attempts = 0;
+            const checkInterval = setInterval(() => {
+                if (check() || attempts >= maxAttempts) {
+                    clearInterval(checkInterval);
+                    if (attempts >= maxAttempts) {
+                        console.log('Timeout waiting for data channel');
+                        resolve(); // Resolve anyway to not block the UI
                     }
-                }, 100);
-            }
+                }
+                attempts++;
+            }, 100);
         });
     }
 
