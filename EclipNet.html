@@ -123,6 +123,7 @@
   <!-- p2p -->
     <div>
         <button id="p2p-init">Init peer connection</button>
+        <button id="p2p-start">Start (force initiator)</button>
     </div>
 
         <div id="input-line">
@@ -145,6 +146,7 @@
             const submitButton = document.getElementById('submitButton');
             const terminal = document.getElementById('terminal');
             const p2pInitButton = document.getElementById('p2p-init');
+            const p2pStartButton = document.getElementById('p2p-start');
 
             // Helper function to scroll app's internal elements
             function scrollToBottom() {
@@ -266,18 +268,52 @@
                         clearInterval(monitorInterval);
                     });
 
-                    await p2p.createOffer();
-                    output.textContent += '\n[System] Offer sent. Waiting for peer...\n';
-                    scrollToBottom();
-
-                    // Wait for data channel to open
-                    await p2p.waitForDataChannel();
-                    output.textContent += '\n[System] Data channel established!\n';
+                    // We no longer automatically create an offer here. The P2P layer
+                    // will deterministically elect an initiator when a peer joins and
+                    // create the offer from that side. Show waiting message instead.
+                    output.textContent += '\n[System] Waiting for peer or initiator election...\n';
                     scrollToBottom();
 
                 } catch (error) {
                     isConnectionInitialized = false;
                     output.textContent += '\n[System] Error: ' + error.message + '\n';
+                    scrollToBottom();
+                }
+            });
+
+            // Manual Start: force this client to act as initiator and create an offer
+            p2pStartButton.addEventListener('click', async () => {
+                if (isConnectionInitialized) {
+                    output.textContent += '\n[System] Connection already initialized.\n';
+                    scrollToBottom();
+                    return;
+                }
+
+                try {
+                    isConnectionInitialized = true;
+                    // Force this client to be the initiator
+                    p2p.isInitiator = true;
+                    p2p.initPeer();
+
+                    output.textContent += '\n[System] Starting connection as forced initiator...\n';
+                    scrollToBottom();
+
+                    // Create offer and wait for data channel
+                    await p2p.createOffer();
+                    output.textContent += '\n[System] Offer sent. Waiting for peer...\n';
+                    scrollToBottom();
+
+                    try {
+                        await p2p.waitForDataChannel();
+                        output.textContent += '\n[System] Data channel established!\n';
+                        scrollToBottom();
+                    } catch (err) {
+                        output.textContent += '\n[System] Error: ' + err.message + '\n';
+                        scrollToBottom();
+                    }
+                } catch (error) {
+                    isConnectionInitialized = false;
+                    output.textContent += '\n[System] Error starting connection: ' + error.message + '\n';
                     scrollToBottom();
                 }
             });

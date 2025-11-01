@@ -410,12 +410,34 @@ window.P2P = {
     // create peer connection offer, used by peer initializing the communication
     createOffer: async function() {
         try {
+            if (!this.isInitiator) {
+                console.log('createOffer called but this peer is not the initiator - skipping');
+                return;
+            }
+
+            if (this.isNegotiating) {
+                console.log('Already negotiating - skipping duplicate createOffer');
+                return;
+            }
+
             if (this.localPeerConnection.signalingState !== 'stable') {
                 console.log('Cannot create offer - wrong state:', this.localPeerConnection.signalingState);
                 return;
             }
-            
-            this.isInitiator = true;
+
+            // Ensure data channel exists before creating the offer
+            if (!this.dataChannel && this.isInitiator) {
+                try {
+                    this.dataChannel = this.localPeerConnection.createDataChannel('messageChannel');
+                    console.log('Created data channel before offer:', this.dataChannel.label);
+                    this.setupDataChannelHandlers(this.dataChannel);
+                } catch (e) {
+                    console.error('Error creating data channel before offer:', e);
+                }
+            }
+
+            this.isNegotiating = true;
+
             // create offer and set it as local description
             const offer = await this.localPeerConnection.createOffer();
             await this.localPeerConnection.setLocalDescription(offer);
@@ -431,6 +453,7 @@ window.P2P = {
             // return the offer
             return offer;
         } catch (error) {
+            this.isNegotiating = false;
             throw new Error("Error creating offer:" + error);
         }
     },
@@ -517,6 +540,8 @@ window.P2P = {
                         console.warn('Error adding pending candidate after answer:', e);
                     }
                 }
+                // Negotiation complete
+                this.isNegotiating = false;
             } else {
                 console.log('Cannot accept answer - wrong state:', this.localPeerConnection.signalingState);
             }
