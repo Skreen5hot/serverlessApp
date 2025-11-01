@@ -6,6 +6,7 @@ class P2P {
         this.dataChannel = null;
         this.isInitiator = false;
         this.isConnected = false;
+        this.pendingCandidates = [];
         this.socket = new io(this.signalingServerURL);
         
         // Generate a unique user ID
@@ -35,26 +36,46 @@ class P2P {
             }
         });
 
-        // ICE candidate received from signalign server, add it
+        // ICE candidate received from signaling server
         this.socket.on('receive-ice-candidate', async (data) => {
-            if (data.userId !== this.userId) {
-                this.localPeerConnection.addIceCandidate(data.candidate);
+            if (data.userId === this.userId) return;
+            
+            try {
+                if (this.localPeerConnection.remoteDescription) {
+                    await this.localPeerConnection.addIceCandidate(data.candidate);
+                    console.log('Added ICE candidate');
+                } else {
+                    // Store candidates until remote description is set
+                    this.pendingCandidates.push(data.candidate);
+                    console.log('Stored pending ICE candidate');
+                }
+            } catch (e) {
+                console.warn('Error adding ICE candidate:', e);
             }
         });
     }
 
     initPeer() {
-        const stunServers = [
-            { urls: 'stun:23.21.150.121:3478' },
-            { urls: 'stun:stun.l.google.com:19302' },
-            { urls: 'stun:stun1.l.google.com:19302' },
-            { urls: 'stun:stun2.l.google.com:19302' },
-        ];
+        if (this.localPeerConnection) {
+            this.localPeerConnection.close();
+        }
+        
+        const config = {
+            iceServers: [
+                { urls: 'stun:stun.l.google.com:19302' },
+                { urls: 'stun:stun1.l.google.com:19302' }
+            ],
+            iceTransportPolicy: 'all',
+            iceCandidatePoolSize: 10
+        };
 
+        // Reset connection state
+        this.isInitiator = false;
+        this.isConnected = false;
+        this.pendingCandidates = [];
+        
         // create peer connection
-        this.localPeerConnection = new RTCPeerConnection({
-            iceServers: stunServers
-        });
+        this.localPeerConnection = new RTCPeerConnection(config);
 
         // Handle incoming data channels
         this.localPeerConnection.addEventListener('datachannel', (event) => {
@@ -157,6 +178,18 @@ class P2P {
         // set remote description
         try {
             await this.localPeerConnection.setRemoteDescription(offer);
+            console.log('Set remote description, processing pending candidates');
+            
+            // Add any pending ICE candidates
+            while (this.pendingCandidates.length) {
+                const candidate = this.pendingCandidates.shift();
+                try {
+                    await this.localPeerConnection.addIceCandidate(candidate);
+                    console.log('Added pending ICE candidate');
+                } catch (e) {
+                    console.warn('Error adding pending candidate:', e);
+                }
+            }
         } catch(e) {
             console.error('Error setting remote description:', e);
             return;
