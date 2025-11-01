@@ -99,11 +99,25 @@ class P2P2 {
         };
 
         this.dataChannel.onopen = () => {
+            if (!this.channelReady) { // Prevent double-logging
+                this.log('Data channel opened - ready to communicate!');
+                const p2pButton = document.getElementById('p2p-init');
+                if (p2pButton) {
+                    p2pButton.textContent = '1 Peer Connected';
+                    p2pButton.classList.add('connected');
+                }
+            }
             this.log('Data channel opened - ready to communicate!');
+            this.channelReady = true;
         };
 
         this.dataChannel.onclose = () => {
             this.log('Data channel closed.');
+            const p2pButton = document.getElementById('p2p-init');
+            if (p2pButton) {
+                p2pButton.textContent = 'Init peer connection';
+                p2pButton.classList.remove('connected');
+            }
             this.channelReady = false;
         };
     }

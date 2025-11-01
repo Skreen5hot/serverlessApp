@@ -82,6 +82,32 @@ body {
     padding: 0;
     caret-color: #00FF00;
 }
+/* --- NEW: Styles for the P2P connection button --- */
+#p2p-init {
+    background-color: #222;
+    border: 1px solid #00FF00;
+    color: #00FF00;
+    font-family: inherit;
+    font-size: inherit;
+    cursor: pointer;
+    padding: 4px 8px;
+    margin-bottom: 5px; /* Add some space below it */
+    transition: background-color 0.3s, color 0.3s;
+}
+
+#p2p-init.connected {
+    background-color: #00FF00;
+    color: #000;
+    animation: pulse 1.5s infinite;
+}
+
+@keyframes pulse {
+    0% { box-shadow: 0 0 5px rgba(0, 255, 0, 0.5); }
+    50% { box-shadow: 0 0 15px rgba(0, 255, 0, 1); }
+    100% { box-shadow: 0 0 5px rgba(0, 255, 0, 0.5); }
+}
+/* ---------------------------------------------------- */
+
 
 /* The submit button */
 #submitButton {
