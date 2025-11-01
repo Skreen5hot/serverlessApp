@@ -56,7 +56,9 @@ class P2P2 {
 
         // Handle incoming data channels
         this.peerConnection.ondatachannel = (event) => {
+            this.log('Remote data channel received');
             this.dataChannel = event.channel;
+            // The initiator already created a channel, so only the receiver needs this.
             this.setupDataChannel();
         };
 
@@ -80,12 +82,14 @@ class P2P2 {
                 const output = document.getElementById('output');
 
                 if (msg.type === 'doc-push') {
-                    // Peer pushed their document to us. We accept it.
-                    // In a real app, you'd want to show a diff and ask for confirmation.
                     output.dispatchEvent(new CustomEvent('doc-update', { detail: msg.content }));
                 } else if (msg.type === 'doc-pull-request') {
-                    // Peer wants our document. We'll push it to them.
                     output.dispatchEvent(new CustomEvent('doc-push-request'));
+                } else if (msg.type === 'chat') {
+                    output.dispatchEvent(new CustomEvent('chat-message', { detail: msg.content }));
+                } else {
+                    // Fallback for simple string messages
+                    output.dispatchEvent(new CustomEvent('chat-message', { detail: event.data }));
                 }
 
             } catch (e) {
@@ -100,6 +104,7 @@ class P2P2 {
 
         this.dataChannel.onclose = () => {
             this.log('Data channel closed.');
+            this.channelReady = false;
         };
     }
 
