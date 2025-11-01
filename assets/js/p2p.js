@@ -1,18 +1,21 @@
 // peer to peer communication layer
 class P2P {
-
-    signalingServerURL = 'wss://signal.filonexus.com';
-    // signalingServerURL = 'http://localhost:3888';
-    localPeerConnection = null; // null or RTCPeerConnection
-
-    dataChannel = null; // null or RTCDataChannel
-
-    socket = new io(this.signalingServerURL);
-
-    // unique user id used for signaling in order to ignore own messages
-    userId = Math.round(Math.random() * 1000000);
-
-    onmessage = null; // if a function is assigned, it will be called whenever a message is received from peers
+    constructor() {
+        this.signalingServerURL = 'wss://signal.filonexus.com';
+        this.localPeerConnection = null;
+        this.dataChannel = null;
+        this.isInitiator = false;
+        this.isConnected = false;
+        this.socket = new io(this.signalingServerURL);
+        
+        // Generate a unique user ID
+        this.userId = Math.random().toString(36).substr(2, 9);
+        
+        this.onmessage = null;
+        
+        this.socket.on('connect', () => {
+            console.log('Connected to signaling server with ID:', this.userId);
+        });
 
     constructor() {
         this.initPeer();
