@@ -10,12 +10,7 @@ class P2P {
         
         // Generate a unique user ID
         this.userId = Math.random().toString(36).substr(2, 9);
-        
         this.onmessage = null;
-        
-        this.socket.on('connect', () => {
-            console.log('Connected to signaling server with ID:', this.userId);
-        });
 
         this.initPeer();
 
@@ -27,7 +22,7 @@ class P2P {
             }
         });
 
-        // answer received from signalign server, accept
+        // answer received from signaling server, accept
         this.socket.on('receive-answer', async (data) => {
             if (data.userId !== this.userId && this.isInitiator) {
                 console.log('Received answer as initiator');
@@ -35,7 +30,7 @@ class P2P {
             }
         });
 
-        // ICE candidate received from signalign server, add it
+        // ICE candidate received from signaling server, add it
         this.socket.on('receive-ice-candidate', async (data) => {
             if (data.userId !== this.userId) {
                 this.localPeerConnection.addIceCandidate(data.candidate);
@@ -66,7 +61,7 @@ class P2P {
             });
         });
 
-        // received ICE candidate for local peer, send to signalign server to broadcast
+        // received ICE candidate for local peer, send to signaling server to broadcast
         this.localPeerConnection.addEventListener('icecandidate', (ice) => {
             if (ice.candidate) {
                 this.socket.emit('send-ice-candidate', {
@@ -93,7 +88,7 @@ class P2P {
             const offer = await this.localPeerConnection.createOffer();
             await this.localPeerConnection.setLocalDescription(offer);
 
-            console.log('created offer as initiator')
+            console.log('created offer as initiator');
 
             // send offer to signaling server
             this.socket.emit('send-offer', {
@@ -137,9 +132,9 @@ class P2P {
         const answer = await this.localPeerConnection.createAnswer();
         await this.localPeerConnection.setLocalDescription(answer);
 
-        console.log('offer accepted')
+        console.log('offer accepted');
 
-        // send answer to signalign server
+        // send answer to signaling server
         this.socket.emit('send-answer', {
             userId: this.userId,
             answer
@@ -176,13 +171,14 @@ class P2P {
     send(message) {
         if (this.localPeerConnection === null) {
             alert('P2P connection not open');
+            return;
         }
         if (this.dataChannel !== null && this.dataChannel.readyState === 'open') {
             this.dataChannel.send(typeof message === 'string' ? message : JSON.stringify(message));
         } else {
-            console.log('data channel not initialized')
+            console.log('data channel not initialized');
         }
     }
-}
+} // End of P2P class
 
 var p2p = new P2P();
