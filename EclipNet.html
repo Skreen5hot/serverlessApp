@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="height=device-height, width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <title>EclipNet</title>
+    <link href="https://fonts.googleapis.com/css2?family=VT323&display=swap" rel="stylesheet">
+    <script src="assets/third-party/js/socketio.js"></script>
+    <script src="assets/js/p2p.js"></script>
+    <style>
+        /* --- NEW: Lock the page scroll --- */
+        html {
+            position: fixed;
+            overflow: hidden;
+            width: 100%;
+            height: 100%;
+        }
+
+        /* Apply basic styles to the whole page */
+        body {
+            background-color: #111;
+            display: flex;
+            justify-content: center;
+            /* Keeps terminal at the top when resized */
+            align-items: flex-start;
+            /* Fill the 'fixed' html element */
+            width: 100%;
+            height: 100%;
+            margin: 0;
+            font-family: 'VT323', monospace;
+        }
+
+        /* The main terminal window */
+        #terminal {
+            background-color: #000;
+            color: #00FF00;
+            font-size: 20px;
+            width: 100%;
+            /* Height is controlled by JavaScript */
+            height: 100%;
+            padding: 10px;
+            box-shadow: 0 0 15px rgba(0, 255, 0, 0.3);
+            display: flex;
+            flex-direction: column;
+            box-sizing: border-box;
+        }
+
+        /* The output area */
+        #output {
+            flex-grow: 1;
+            overflow-y: auto;
+            margin: 0;
+            padding: 0;
+            white-space: pre-wrap;
+            word-break: break-all;
+        }
+
+        /* Style the scrollbar */
+        #output::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        #output::-webkit-scrollbar-track {
+            background: #111;
+        }
+
+        #output::-webkit-scrollbar-thumb {
+            background: #00FF00;
+        }
+
+        /* The container for the input prompt */
+        #input-line {
+            display: flex;
+            align-items: center;
+            padding-top: 5px;
+        }
+
+        /* The '>' prompt */
+        #input-line span {
+            margin-right: 5px;
+        }
+
+        /* The text input box */
+        #inputBox {
+            flex-grow: 1;
+            background-color: transparent;
+            border: none;
+            color: #00FF00;
+            font-family: inherit;
+            font-size: inherit;
+            outline: none;
+            padding: 0;
+            caret-color: #00FF00;
+        }
+
+        /* The submit button */
+        #submitButton {
+            background-color: #222;
+            border: 1px solid #00FF00;
+            color: #00FF00;
+            font-family: inherit;
+            font-size: inherit;
+            margin-left: 10px;
+            cursor: pointer;
+            padding: 4px 8px;
+        }
+
+        @media (max-width: 600px) {
+            #terminal {
+                font-size: 18px;
+            }
+        }
+    </style>
+</head>
+
+<body>
+
+    <div id="terminal">
+
+        <pre id="output">Welcome to EclipNet v1.0
+!(C) 2025 ALL RIGHTS RELEASED</pre>
+  <!-- p2p -->
+    <div>
+        <button id="p2p-init">Init peer connection</button>
+    </div>
+
+        <div id="input-line">
+            <span>> </span>
+            <input type="text" id="inputBox" autofocus>
+            <button id="submitButton">ENTER</button>
+        </div>
+
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            // Initialize P2P instance
+            const p2p = new P2P();
+            
+            const output = document.getElementById('output');
+            const inputBox = document.getElementById('inputBox');
+            const submitButton = document.getElementById('submitButton');
+            const terminal = document.getElementById('terminal');
+            const p2pInitButton = document.getElementById('p2p-init');
+
+            // Helper function to scroll app's internal elements
+            function scrollToBottom() {
+                output.scrollTop = output.scrollHeight;
+                inputBox.scrollIntoView({
+                    block: 'nearest'
+                });
+            }
+
+            // Function to process the typed command
+            function processCommand() {
+                const command = inputBox.value;
+                output.textContent += `\n> ${command}`;
+                
+                // Send message through P2P if connection is established
+                if (p2p.dataChannel && p2p.dataChannel.readyState === 'open') {
+                    p2p.dataChannel.send(JSON.stringify({ text: command }));
+                    output.textContent += `\nMessage sent: ${command}\n`;
+                } else {
+                    output.textContent += `\n${command}\n`;
+                }
+                
+                inputBox.value = '';
+                scrollToBottom();
+            }
+
+            // --- UPDATED: Viewport Resize Handler ---
+            function handleViewportResize() {
+                // Set the terminal height to the exact visible height
+                terminal.style.height = `${window.visualViewport.height}px`;
+
+                // --- THIS IS THE FIX ---
+                // Force the window's layout scroll position back to (0, 0)
+                window.scrollTo(0, 0);
+                // ---------------------
+
+                // Scroll our internal elements to the bottom
+                scrollToBottom();
+            }
+            // ------------------------------------------
+
+            // --- Event Listeners ---
+            submitButton.addEventListener('click', processCommand);
+
+            inputBox.addEventListener('keydown', (event) => {
+                if (event.key === 'Enter') {
+                    event.preventDefault();
+                    processCommand();
+                }
+            });
+
+            // Focus input when terminal is clicked
+            terminal.addEventListener('click', () => {
+                inputBox.focus();
+            });
+
+            // Scroll to bottom when input is focused
+            inputBox.addEventListener('focus', () => {
+                scrollToBottom();
+            });
+
+            // Add the main viewport listener
+            window.visualViewport.addEventListener('resize', handleViewportResize);
+
+            // Set the initial size on page load
+            handleViewportResize();
+
+            // P2P initialization and message handling
+            p2pInitButton.addEventListener('click', async () => {
+                try {
+                    await p2p.createOffer();
+                    output.textContent += '\nP2P Connection Initialized. Waiting for peer...\n';
+                    scrollToBottom();
+                } catch (error) {
+                    output.textContent += '\nError initializing P2P connection: ' + error.message + '\n';
+                    scrollToBottom();
+                }
+            });
+
+            // Handle incoming P2P messages
+            p2p.onmessage = (msg) => {
+                output.textContent += `\nReceived: ${msg.text}\n`;
+                scrollToBottom();
+            };
+        });
+    </script>
+</body>
+
+</html>
