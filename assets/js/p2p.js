@@ -152,53 +152,91 @@ class P2P {
 
         // Setup handlers for data channel creation and connection state changes
         this.localPeerConnection.ondatachannel = (event) => {
-            console.log('Remote data channel created');
+            console.log('Remote data channel received');
             this.dataChannel = event.channel;
             this.setupDataChannelHandlers(this.dataChannel);
         };
 
-        // Only create data channel if we're the initiator
-        if (this.isInitiator && !this.dataChannel) {
-            const dataChannelConfig = {
-                ordered: true,
-                maxRetransmits: 3,  // Allow up to 3 retransmission attempts
-                protocol: 'json'    // Indicate we're sending JSON data
-            };
-            try {
-                this.dataChannel = this.localPeerConnection.createDataChannel('messages', dataChannelConfig);
-                console.log('Created local data channel');
-                this.setupDataChannelHandlers(this.dataChannel);
-            } catch (e) {
-                console.error('Error creating data channel:', e);
-            }
+        // Create data channel immediately for both initiator and receiver
+        const dataChannelConfig = {
+            ordered: true,
+            maxPacketLifeTime: 3000  // Give packets 3 seconds to arrive
+        };
+
+        try {
+            // Create the data channel with the same label on both sides
+            this.dataChannel = this.localPeerConnection.createDataChannel('messageChannel', dataChannelConfig);
+            console.log('Created data channel:', this.dataChannel.label);
+            this.setupDataChannelHandlers(this.dataChannel);
+        } catch (e) {
+            console.error('Error creating data channel:', e);
         }
     }
 
     async waitForDataChannel() {
-        return new Promise((resolve) => {
-            const check = () => {
-                if (this.dataChannel && this.dataChannel.readyState === 'open') {
-                    console.log('Data channel is ready');
-                    resolve();
-                    return true;
-                }
-                return false;
+        return new Promise((resolve, reject) => {
+            // If channel is already open, resolve immediately
+            if (this.dataChannel && this.dataChannel.readyState === 'open') {
+                console.log('Data channel already open');
+                resolve(true);
+                return;
+            }
+
+            // Set up one-time event listener for channel open
+            const onOpen = () => {
+                console.log('Data channel opened');
+                cleanup();
+                resolve(true);
             };
 
-            if (check()) return;
+            // Set up one-time event listener for channel error
+            const onError = (error) => {
+                console.error('Data channel error:', error);
+                cleanup();
+                reject(error);
+            };
 
-            const maxAttempts = 50; // 5 seconds
-            let attempts = 0;
-            const checkInterval = setInterval(() => {
-                if (check() || attempts >= maxAttempts) {
-                    clearInterval(checkInterval);
-                    if (attempts >= maxAttempts) {
-                        console.log('Timeout waiting for data channel');
-                        resolve(); // Resolve anyway to not block the UI
-                    }
+            // Set up one-time event listener for connection failure
+            const onFailed = () => {
+                console.error('Connection failed while waiting for data channel');
+                cleanup();
+                reject(new Error('Connection failed'));
+            };
+
+            // Function to remove all event listeners
+            const cleanup = () => {
+                if (this.dataChannel) {
+                    this.dataChannel.removeEventListener('open', onOpen);
+                    this.dataChannel.removeEventListener('error', onError);
                 }
-                attempts++;
-            }, 100);
+                if (this.localPeerConnection) {
+                    this.localPeerConnection.removeEventListener('connectionstatechange', onConnectionChange);
+                }
+                clearTimeout(timeoutId);
+            };
+
+            // Handle connection state changes
+            const onConnectionChange = () => {
+                const state = this.localPeerConnection.connectionState;
+                if (state === 'failed' || state === 'closed') {
+                    onFailed();
+                }
+            };
+
+            // Add event listeners
+            if (this.dataChannel) {
+                this.dataChannel.addEventListener('open', onOpen);
+                this.dataChannel.addEventListener('error', onError);
+            }
+            if (this.localPeerConnection) {
+                this.localPeerConnection.addEventListener('connectionstatechange', onConnectionChange);
+            }
+
+            // Set timeout
+            const timeoutId = setTimeout(() => {
+                cleanup();
+                reject(new Error('Timeout waiting for data channel'));
+            }, 10000); // 10 second timeout
         });
     }
 
