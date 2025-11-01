@@ -16,16 +16,20 @@ class P2P {
 
     constructor() {
         this.initPeer();
+        this.isInitiator = false;
+
         // offer received from signaling server, accept and send answer
         this.socket.on('receive-offer', async (data) => {
-            if (data.userId !== this.userId) {
+            if (data.userId !== this.userId && !this.isInitiator) {
+                console.log('Received offer as receiver');
                 await this.acceptOffer(data.offer.sdp);
             }
         });
 
         // answer received from signalign server, accept
         this.socket.on('receive-answer', async (data) => {
-            if (data.userId !== this.userId) {
+            if (data.userId !== this.userId && this.isInitiator) {
+                console.log('Received answer as initiator');
                 await this.acceptAnswer(data.answer.sdp);
             }
         });
@@ -75,14 +79,20 @@ class P2P {
         this.dataChannel = this.localPeerConnection.createDataChannel('messages');
     }
 
-    // create peer connection offer, used by peer initializing the coomunication
+    // create peer connection offer, used by peer initializing the communication
     async createOffer() {
         try {
+            if (this.localPeerConnection.signalingState !== 'stable') {
+                console.log('Cannot create offer - wrong state:', this.localPeerConnection.signalingState);
+                return;
+            }
+            
+            this.isInitiator = true;
             // create offer and set it as local description
             const offer = await this.localPeerConnection.createOffer();
             await this.localPeerConnection.setLocalDescription(offer);
 
-            console.log('created offer')
+            console.log('created offer as initiator')
 
             // send offer to signaling server
             this.socket.emit('send-offer', {
@@ -99,7 +109,15 @@ class P2P {
 
     // accept incoming offer from remote peer, used by peer receiving the connection
     async acceptOffer(sdp) {
-        // this.initPeer();
+        if (this.isInitiator) {
+            console.log('Ignoring offer - we are the initiator');
+            return;
+        }
+
+        if (this.localPeerConnection.signalingState !== 'stable') {
+            console.log('Cannot accept offer - wrong state:', this.localPeerConnection.signalingState);
+            return;
+        }
 
         const offer = new RTCSessionDescription({
             type: 'offer',
@@ -110,7 +128,8 @@ class P2P {
         try {
             await this.localPeerConnection.setRemoteDescription(offer);
         } catch(e) {
-            alert(e);
+            console.error('Error setting remote description:', e);
+            return;
         }
 
         // create answer and set it as local description

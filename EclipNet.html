@@ -212,8 +212,12 @@
             // P2P initialization and message handling
             p2pInitButton.addEventListener('click', async () => {
                 try {
+                    // Reset connection state
+                    p2p.initPeer();
+                    
+                    output.textContent += '\n[System] Initializing connection...\n';
                     await p2p.createOffer();
-                    output.textContent += '\n[System] P2P Connection Initialized. Waiting for peer...\n';
+                    output.textContent += '\n[System] Offer created. Waiting for peer...\n';
                     scrollToBottom();
 
                     // Add event listeners for connection state changes
@@ -224,6 +228,20 @@
 
                     p2p.dataChannel.addEventListener('close', () => {
                         output.textContent += '\n[System] Connection closed\n';
+                        scrollToBottom();
+                    });
+
+                    // Listen for connection state changes
+                    p2p.localPeerConnection.addEventListener('connectionstatechange', () => {
+                        const state = p2p.localPeerConnection.connectionState;
+                        output.textContent += `\n[System] Connection state: ${state}\n`;
+                        scrollToBottom();
+                    });
+
+                    // Listen for signaling state changes
+                    p2p.localPeerConnection.addEventListener('signalingstatechange', () => {
+                        const state = p2p.localPeerConnection.signalingState;
+                        output.textContent += `\n[System] Signaling state: ${state}\n`;
                         scrollToBottom();
                     });
                 } catch (error) {
