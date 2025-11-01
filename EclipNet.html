@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="height=device-height, width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <title>Retro Terminal</title>
+    <script src="assets/js/p2p.js"></script>
+    <script src="assets/third-party/js/socketio.js" defer></script>
+    <script src="assets/js/p2p2.js" defer></script>
+    <script src="assets/js/EclipNet.js" defer></script>
+    <link href="https://fonts.googleapis.com/css2?family=VT323&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="assets/css/EclipNet.css">
+</head>
+
+<body>
+
+    <div id="terminal">
+
+        <pre id="output">Welcome to EclipNet v1.0
+!(C) 2025 ALL RIGHTS RELEASED
+Ready.</pre>
+
+    <!-- p2p -->
+    <div>
+        <button id="p2p-init">Init peer connection</button>
+    </div>
+
+        <div id="input-line">
+            <span>> </span>
+            <input type="text" id="inputBox" autofocus>
+            <button id="submitButton">ENTER</button>
+        </div>
+
+    </div>
+
+</body>
+
+</html>
