@@ -51,22 +51,18 @@ document.addEventListener('DOMContentLoaded', () => {
                     appendOutput('Error: Could not pull. No peer connected?');
                 }
                 break;
-            case 'send':
-                const message = parts.slice(1).join(' ');
-                if (p2p.sendMessage({ type: 'chat', content: message })) {
-                    appendOutput(`Sent: ${message}`);
-                } else {
-                    appendOutput('Error: Could not send. No peer connected?');
-                }
-                break;
             case 'help':
-                appendOutput('Available commands:\n  send <message> - Send a chat message\n  cat            - Display the shared document\n  push           - Send your document version to the peer\n  pull           - Request document from the peer');
+                appendOutput('Available commands:\n  /help          - Show this help message\n  /cat           - Display the shared document\n  /push          - Send your document version to the peer\n  /pull          - Request document from the peer\n\nAny other text is sent as a chat message.');
                 break;
             default:
-                appendOutput(`Command not found: ${cmd}`);
+                // If it's not a known command, treat it as a chat message.
+                if (p2p.sendMessage({ type: 'chat', content: command })) {
+                    // We don't need to show "Sent: ..." because the input is already echoed.
+                } else {
+                    appendOutput('Error: Could not send message. No peer connected?');
+                }
                 break;
         }
-        // --- END: Command parsing ---
 
         inputBox.value = '';
     }
