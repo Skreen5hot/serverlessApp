@@ -106,7 +106,10 @@ window.P2P = {
             ],
             iceTransportPolicy: 'all',
             iceCandidatePoolSize: 0,
-            bundlePolicy: 'max-bundle',
+            // Use 'balanced' to avoid requiring an explicit BUNDLE group in the SDP
+            // 'max-bundle' can cause setLocalDescription to fail when the generated
+            // SDP doesn't include a BUNDLE group (common in datachannel-only offers).
+            bundlePolicy: 'balanced',
             rtcpMuxPolicy: 'require'
         };
 
