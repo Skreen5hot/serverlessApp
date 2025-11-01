@@ -5,11 +5,10 @@ document.addEventListener('DOMContentLoaded', () => {
     const submitButton = document.getElementById('submitButton');
     const terminal = document.getElementById('terminal');
 
-    // --- NEW: Shared data store ---
+    // Shared data store
     let sharedDocument = "Welcome to EclipNet. This is a shared document.";
-    // --- NEW: Display initial document ---
+    // Display initial document
     output.textContent = sharedDocument;
-
 
     // Helper function to scroll app's internal elements
     function scrollToBottom() {
@@ -19,7 +18,7 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    // --- NEW: Function to append text to the output ---
+    // Function to append text to the output
     function appendOutput(text) {
         output.textContent += `\n${text}`;
         scrollToBottom();
@@ -30,11 +29,34 @@ document.addEventListener('DOMContentLoaded', () => {
         const command = inputBox.value;
         appendOutput(`> ${command}`);
 
-        // --- NEW: Command parsing ---
+        // Command parsing
         const parts = command.trim().split(' ');
         const cmd = parts[0].toLowerCase();
 
-        switch (cmd) { // Note: 'send' command is for the simpler p2p2.js logic
+        switch (cmd) {
+            case 'help':
+                appendOutput('Available commands:\n  cat - Display the document\n  push - Send your document version to the peer\n  pull - Request the document from the peer');
+                break;
+            case 'cat':
+                appendOutput(sharedDocument);
+                break;
+            case 'push':
+                if (p2p.sendMessage({ type: 'doc-push', content: sharedDocument })) {
+                    appendOutput('Document pushed to peer.');
+                } else {
+                    appendOutput('Error: Could not push. No peer connected?');
+                }
+                break;
+            case 'pull':
+                if (p2p.sendMessage({ type: 'doc-pull-request' })) {
+                    appendOutput('Pull request sent to peer.');
+                } else {
+                    appendOutput('Error: Could not pull. No peer connected?');
+                }
+                break;
+            case 'send': // For p2p2.js direct sending for debugging
+                p2p.sendMessage(parts.slice(1).join(' '));
+                break;
             case 'help':
                 appendOutput('Available commands:\n  cat - Display the document\n  push - Send your document version to the peer\n  pull - Request the document from the peer');
                 break;
@@ -108,7 +130,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // Set the initial size on page load
     handleViewportResize();
 
-    // --- NEW: Listen for document updates from P2P layer ---
+    // Listen for document updates from P2P layer
     output.addEventListener('doc-update', (e) => {
         sharedDocument = e.detail;
         appendOutput('\n--- Document updated by peer ---');
@@ -116,10 +138,10 @@ document.addEventListener('DOMContentLoaded', () => {
         appendOutput('------------------------------');
     });
 
+    // Listen for a peer's request to pull our document
     output.addEventListener('doc-push-request', () => {
         if (p2p.sendMessage({ type: 'doc-push', content: sharedDocument })) {
             appendOutput('Peer requested document. Pushing current version.');
         }
     });
-    // --- END: P2P Listeners ---
 });

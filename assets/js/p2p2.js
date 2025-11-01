@@ -71,22 +71,21 @@ class P2P2 {
         if (!this.dataChannel) return;
 
         this.dataChannel.onmessage = (event) => {
-            // --- NEW: Handle different message types ---
+            // Handle different message types
             try {
                 const msg = JSON.parse(event.data);
                 this.log(`Received: ${msg.type}`);
 
                 // Find the shared document and output function from the main script
                 const output = document.getElementById('output');
-                const mainScript = Array.from(document.scripts).find(s => s.src.includes('EclipNet.js'));
 
                 if (msg.type === 'doc-push') {
                     // Peer pushed their document to us. We accept it.
                     // In a real app, you'd want to show a diff and ask for confirmation.
-                    mainScript.dispatchEvent(new CustomEvent('doc-update', { detail: msg.content }));
+                    output.dispatchEvent(new CustomEvent('doc-update', { detail: msg.content }));
                 } else if (msg.type === 'doc-pull-request') {
                     // Peer wants our document. We'll push it to them.
-                    mainScript.dispatchEvent(new CustomEvent('doc-push-request'));
+                    output.dispatchEvent(new CustomEvent('doc-push-request'));
                 }
 
             } catch (e) {
@@ -153,13 +152,12 @@ class P2P2 {
 
     sendMessage(message) {
         if (this.dataChannel && this.dataChannel.readyState === 'open') {
-            // --- NEW: Always send JSON strings ---
+            // Always send JSON strings for objects
             const data = typeof message === 'string' ? message : JSON.stringify(message);
             this.dataChannel.send(data);
             if (typeof message === 'object') {
                 this.log(`Sent: ${message.type}`);
             }
-            this.log(`Sent: ${message}`);
             return true;
         }
         this.log('Cannot send message - no open connection');
@@ -194,34 +192,14 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function handleCommand(command) {
         if (command.startsWith('/send ')) {
-            // We are replacing this with our new command processor
+            // This is now handled by the main command processor in EclipNet.js
             // const message = command.slice(6);
             // p2p.sendMessage(message);
         }
     }
 
     if (submitButton && inputBox) {
-        submitButton.addEventListener('click', () => {
-            // This is now handled by the main command processor in EclipNet.js
-            // handleCommand(inputBox.value);
-        });
-
-        inputBox.addEventListener('keydown', (event) => {
-            if (event.key === 'Enter') {
-                // This is now handled by the main command processor in EclipNet.js
-                // handleCommand(inputBox.value);
-            }
-        });
+        // Command handling is now done in EclipNet.js
     }
 
-    // --- NEW: Listen for custom events from p2p2.js ---
-    const mainScript = Array.from(document.scripts).find(s => s.src.includes('EclipNet.js'));
-    if (mainScript) {
-        mainScript.addEventListener('doc-update', (e) => {
-            document.getElementById('output').dispatchEvent(new CustomEvent('doc-update', { detail: e.detail }));
-        });
-        mainScript.addEventListener('doc-push-request', () => {
-            document.getElementById('output').dispatchEvent(new CustomEvent('doc-push-request'));
-        });
-    }
 });
