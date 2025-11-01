@@ -33,12 +33,28 @@ window.P2P = {
             this.socket.emit('join', { userId: this.userId });
         });
 
-        // When another peer joins
-        this.socket.on('peer-joined', (data) => {
-            if (data.userId !== this.userId) {
-                console.log('Peer joined:', data.userId);
-                this.isInitiator = true;
-                this.initPeer();
+        // When another peer joins — choose an initiator deterministically using userId
+        this.socket.on('peer-joined', async (data) => {
+            if (data.userId === this.userId) return;
+            console.log('Peer joined:', data.userId);
+
+            // Deterministic tie-breaker: the peer with the lexicographically smaller
+            // userId becomes the initiator. This avoids both peers thinking they're
+            // the initiator and creating offer/answer race conditions.
+            const amInitiator = this.userId < data.userId;
+            this.isInitiator = amInitiator;
+
+            // Initialize the PeerConnection (preserves isInitiator)
+            this.initPeer();
+
+            // If we're the chosen initiator, create the data channel and offer
+            if (this.isInitiator) {
+                try {
+                    // createOffer will create/send an offer; ensure it's awaited
+                    await this.createOffer();
+                } catch (e) {
+                    console.error('Error auto-creating offer:', e);
+                }
             }
         });
 
@@ -113,11 +129,10 @@ window.P2P = {
             rtcpMuxPolicy: 'require'
         };
 
-        // Reset connection state
-        this.isInitiator = false;
-        this.isConnected = false;
-        this.pendingCandidates = [];
-        this.dataChannel = null;
+    // Reset connection state (preserve any externally-set isInitiator)
+    this.isConnected = false;
+    this.pendingCandidates = [];
+    this.dataChannel = null;
         
         // create peer connection
         this.localPeerConnection = new RTCPeerConnection(config);
@@ -432,21 +447,24 @@ window.P2P = {
             return;
         }
 
-        const offer = new RTCSessionDescription({
-            type: 'offer',
-            sdp: `${sdp}`
-        });
+        // Accept either a full RTCSessionDescription-like object or a raw SDP string
+        let offerDesc;
+        if (sdp && typeof sdp === 'object' && (sdp.sdp || sdp.type)) {
+            offerDesc = sdp;
+        } else {
+            offerDesc = { type: 'offer', sdp: String(sdp) };
+        }
 
         // set remote description
         try {
-            await this.localPeerConnection.setRemoteDescription(offer);
+            await this.localPeerConnection.setRemoteDescription(offerDesc);
             console.log('Set remote description, processing pending candidates');
             
             // Add any pending ICE candidates
             while (this.pendingCandidates.length) {
                 const candidate = this.pendingCandidates.shift();
-                try {
-                    await this.localPeerConnection.addIceCandidate(candidate);
+                    try {
+                        await this.localPeerConnection.addIceCandidate(new RTCIceCandidate(candidate));
                     console.log('Added pending ICE candidate');
                 } catch (e) {
                     console.warn('Error adding pending candidate:', e);
@@ -483,12 +501,10 @@ window.P2P = {
         }
         
         try {
-            if (this.localPeerConnection.signalingState === 'have-local-offer') {
-                const answer = new RTCSessionDescription({
-                    type: 'answer',
-                    sdp: sdp
-                });
-                await this.localPeerConnection.setRemoteDescription(answer);
+                if (this.localPeerConnection.signalingState === 'have-local-offer') {
+                // Accept either an object or string
+                const answerDesc = (sdp && typeof sdp === 'object' && (sdp.sdp || sdp.type)) ? sdp : { type: 'answer', sdp: String(sdp) };
+                await this.localPeerConnection.setRemoteDescription(answerDesc);
                 console.log('Answer accepted, processing pending candidates');
                 
                 // Process any pending ICE candidates
