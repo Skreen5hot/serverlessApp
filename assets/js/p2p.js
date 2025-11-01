@@ -29,21 +29,35 @@ window.P2P = {
         
         this.socket.on('connect', () => {
             console.log('Connected to signaling server with ID:', this.userId);
+            // Emit join event to notify signaling server
+            this.socket.emit('join', { userId: this.userId });
+        });
+
+        // When another peer joins
+        this.socket.on('peer-joined', (data) => {
+            if (data.userId !== this.userId) {
+                console.log('Peer joined:', data.userId);
+                this.isInitiator = true;
+                this.initPeer();
+            }
         });
 
         // offer received from signaling server, accept and send answer
         this.socket.on('receive-offer', async (data) => {
-            if (data.userId !== this.userId && !this.isInitiator) {
+            if (data.userId !== this.userId) {
                 console.log('Received offer as receiver');
-                await this.acceptOffer(data.offer.sdp);
+                if (!this.localPeerConnection) {
+                    this.initPeer();
+                }
+                await this.acceptOffer(data.offer);
             }
         });
 
-        // answer received from signalign server, accept
+        // answer received from signaling server, accept
         this.socket.on('receive-answer', async (data) => {
             if (data.userId !== this.userId && this.isInitiator) {
                 console.log('Received answer as initiator');
-                await this.acceptAnswer(data.answer.sdp);
+                await this.acceptAnswer(data.answer);
             }
         });
 
@@ -71,16 +85,28 @@ window.P2P = {
     initPeer: function() {
         if (this.localPeerConnection) {
             this.localPeerConnection.close();
+            this.localPeerConnection = null;
         }
+        
+        if (this.dataChannel) {
+            this.dataChannel.close();
+            this.dataChannel = null;
+        }
+
+        // Reset state
+        this.isConnected = false;
+        this.channelReady = false;
+        this.pendingCandidates = [];
         
         const config = {
             iceServers: [
                 { urls: 'stun:stun.l.google.com:19302' },
-                { urls: 'stun:stun1.l.google.com:19302' }
+                { urls: 'stun:stun1.l.google.com:19302' },
+                { urls: 'stun:stun2.l.google.com:19302' }
             ],
             iceTransportPolicy: 'all',
             iceCandidatePoolSize: 0,
-            bundlePolicy: 'balanced',
+            bundlePolicy: 'max-bundle',
             rtcpMuxPolicy: 'require'
         };
 
@@ -150,6 +176,39 @@ window.P2P = {
             }
         });
 
+        // Handle ICE candidate events
+        this.localPeerConnection.onicecandidate = (event) => {
+            if (event.candidate) {
+                console.log('New ICE candidate');
+                this.socket.emit('ice-candidate', {
+                    userId: this.userId,
+                    candidate: event.candidate
+                });
+            }
+        };
+
+        // Handle connection state changes
+        this.localPeerConnection.onconnectionstatechange = () => {
+            console.log('Connection state:', this.localPeerConnection.connectionState);
+            if (this.localPeerConnection.connectionState === 'connected') {
+                this.isConnected = true;
+            } else if (this.localPeerConnection.connectionState === 'failed' ||
+                      this.localPeerConnection.connectionState === 'closed') {
+                this.isConnected = false;
+                this.channelReady = false;
+            }
+        };
+
+        // Handle ICE connection state
+        this.localPeerConnection.oniceconnectionstatechange = () => {
+            console.log('ICE connection state:', this.localPeerConnection.iceConnectionState);
+        };
+
+        // Handle signaling state
+        this.localPeerConnection.onsignalingstatechange = () => {
+            console.log('Signaling state:', this.localPeerConnection.signalingState);
+        };
+
         // Setup handlers for data channel creation and connection state changes
         this.localPeerConnection.ondatachannel = (event) => {
             console.log('Remote data channel received');
@@ -157,19 +216,20 @@ window.P2P = {
             this.setupDataChannelHandlers(this.dataChannel);
         };
 
-        // Create data channel immediately for both initiator and receiver
-        const dataChannelConfig = {
-            ordered: true,
-            maxPacketLifeTime: 3000  // Give packets 3 seconds to arrive
-        };
+        // Create data channel only if we're the initiator
+        if (this.isInitiator) {
+            const dataChannelConfig = {
+                ordered: true,
+                protocol: 'json'
+            };
 
-        try {
-            // Create the data channel with the same label on both sides
-            this.dataChannel = this.localPeerConnection.createDataChannel('messageChannel', dataChannelConfig);
-            console.log('Created data channel:', this.dataChannel.label);
-            this.setupDataChannelHandlers(this.dataChannel);
-        } catch (e) {
-            console.error('Error creating data channel:', e);
+            try {
+                this.dataChannel = this.localPeerConnection.createDataChannel('messageChannel', dataChannelConfig);
+                console.log('Created data channel:', this.dataChannel.label);
+                this.setupDataChannelHandlers(this.dataChannel);
+            } catch (e) {
+                console.error('Error creating data channel:', e);
+            }
         }
     },
 
@@ -242,25 +302,32 @@ window.P2P = {
 
     setupDataChannelHandlers: function(channel) {
         channel.onopen = () => {
-            console.log('Data channel is open and ready to use');
-            this.isConnected = true;
+            console.log('Data channel opened:', channel.label);
             this.channelReady = true;
             
             if (typeof this.onchannelopen === 'function') {
                 this.onchannelopen();
             }
 
-            // If we're the initiator, send a channel verification message
+            // Send immediate ping to verify the channel
             if (this.isInitiator) {
-                this.sendVerification();
+                try {
+                    channel.send(JSON.stringify({
+                        type: 'ping',
+                        timestamp: Date.now()
+                    }));
+                } catch (e) {
+                    console.error('Error sending initial ping:', e);
+                }
             }
         };
 
         channel.onclose = () => {
-            console.log('Data channel closed');
-            this.isConnected = false;
+            console.log('Data channel closed:', channel.label);
             this.channelReady = false;
-            this.dataChannel = null;
+            if (this.dataChannel === channel) {
+                this.dataChannel = null;
+            }
             
             if (typeof this.onchannelclose === 'function') {
                 this.onchannelclose();
@@ -270,10 +337,20 @@ window.P2P = {
         channel.onmessage = (event) => {
             try {
                 const data = JSON.parse(event.data);
-                console.log('Received message:', data);
+                console.log('Received message on channel:', channel.label, data);
                 
-                if (data.type === 'verify-channel') {
-                    this.handleVerification(data);
+                // Handle ping/pong for channel verification
+                if (data.type === 'ping') {
+                    channel.send(JSON.stringify({
+                        type: 'pong',
+                        timestamp: data.timestamp
+                    }));
+                    return;
+                }
+                
+                if (data.type === 'pong') {
+                    const latency = Date.now() - data.timestamp;
+                    console.log('Channel verified with latency:', latency, 'ms');
                     return;
                 }
                 
@@ -287,9 +364,10 @@ window.P2P = {
 
         channel.onerror = (error) => {
             console.error('Data channel error:', error);
-            this.isConnected = false;
             this.channelReady = false;
-            this.dataChannel = null;
+            if (this.dataChannel === channel) {
+                this.dataChannel = null;
+            }
         };
     },
 
