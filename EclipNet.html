@@ -138,6 +138,7 @@
             // Initialize P2P instance
             const p2p = Object.create(P2P);
             p2p.init();
+            window.p2p = p2p; // Make it globally accessible
             
             const output = document.getElementById('output');
             const inputBox = document.getElementById('inputBox');

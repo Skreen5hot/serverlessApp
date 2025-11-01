@@ -1,6 +1,6 @@
 // peer to peer communication layer
-const P2P = {
-    init() {
+window.P2P = {
+    init: function() {
         // Connection settings
         this.signalingServerURL = 'wss://signal.filonexus.com';
         this.isInitiator = false;
@@ -66,7 +66,7 @@ const P2P = {
                 console.warn('Error adding ICE candidate:', e);
             }
         });
-    }
+    },
 
     initPeer: function() {
         if (this.localPeerConnection) {
@@ -171,7 +171,7 @@ const P2P = {
         } catch (e) {
             console.error('Error creating data channel:', e);
         }
-    }
+    },
 
     waitForDataChannel: async function() {
         return new Promise((resolve, reject) => {
@@ -238,7 +238,7 @@ const P2P = {
                 reject(new Error('Timeout waiting for data channel'));
             }, 10000); // 10 second timeout
         });
-    }
+    },
 
     setupDataChannelHandlers: function(channel) {
         channel.onopen = () => {
@@ -291,9 +291,9 @@ const P2P = {
             this.channelReady = false;
             this.dataChannel = null;
         };
-    }
+    },
 
-    sendVerification() {
+    sendVerification: function() {
         if (this.dataChannel && this.dataChannel.readyState === 'open') {
             const verifyMsg = {
                 type: 'verify-channel',
@@ -302,15 +302,14 @@ const P2P = {
             };
             this.dataChannel.send(JSON.stringify(verifyMsg));
         }
-    }
+    },
 
-    handleVerification(data) {
+    handleVerification: function(data) {
         console.log('Channel verification:', data);
         if (!this.isInitiator && data.role === 'initiator') {
             this.sendVerification();
         }
-    }
-    }
+    },
 
     // create peer connection offer, used by peer initializing the communication
     createOffer: async function() {
@@ -338,7 +337,7 @@ const P2P = {
         } catch (error) {
             throw new Error("Error creating offer:" + error);
         }
-    }
+    },
 
     // accept incoming offer from remote peer, used by peer receiving the connection
     acceptOffer: async function(sdp) {
@@ -391,7 +390,7 @@ const P2P = {
 
         // return answer
         return answer;
-    }
+    },
 
     // after receiving peer accepted the offer, they get the answer SDP
     // this is used by initializing peer to accept the answer, after which
@@ -427,7 +426,7 @@ const P2P = {
         } catch (error) {
             console.error('Error accepting answer:', error);
         }
-    }
+    },
 
     // send a message to connected peers
     send: function(message) {
@@ -444,11 +443,11 @@ const P2P = {
             console.error('Error sending message:', error);
             return false;
         }
-    }
+    },
 
     isDataChannelOpen: function() {
         return this.dataChannel && this.dataChannel.readyState === 'open';
-    }
+    },
 
     processPendingCandidates: async function() {
         if (!this.localPeerConnection.remoteDescription) {
