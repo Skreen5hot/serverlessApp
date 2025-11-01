@@ -56,17 +56,14 @@ class P2P {
             iceServers: stunServers
         });
 
-        // data channel created (by local or remote peer)
-        this.localPeerConnection.addEventListener('datachannel', (channel) => {
-            channel.channel.addEventListener('message', (msg) => {
-                console.log(msg);
-                if (typeof this.onmessage === 'function') {
-                    this.onmessage(JSON.parse(msg.data));
-                }
-            });
+        // Handle incoming data channels
+        this.localPeerConnection.addEventListener('datachannel', (event) => {
+            console.log('Received data channel');
+            this.dataChannel = event.channel;
+            this.setupDataChannelHandlers(this.dataChannel);
         });
 
-        // received ICE candidate for local peer, send to signalign server to broadcast
+        // received ICE candidate for local peer, send to signaling server to broadcast
         this.localPeerConnection.addEventListener('icecandidate', (ice) => {
             if (ice.candidate) {
                 this.socket.emit('send-ice-candidate', {
@@ -76,8 +73,40 @@ class P2P {
             }
         });
 
-        // create data channel
-        this.dataChannel = this.localPeerConnection.createDataChannel('messages');
+        // create data channel for the initiator
+        if (!this.dataChannel) {
+            this.dataChannel = this.localPeerConnection.createDataChannel('messages');
+            console.log('Created data channel');
+            this.setupDataChannelHandlers(this.dataChannel);
+        }
+    }
+
+    setupDataChannelHandlers(channel) {
+        channel.addEventListener('open', () => {
+            console.log('Data channel is open and ready to use');
+            this.isConnected = true;
+        });
+
+        channel.addEventListener('close', () => {
+            console.log('Data channel closed');
+            this.isConnected = false;
+        });
+
+        channel.addEventListener('message', (event) => {
+            console.log('Received message:', event.data);
+            if (typeof this.onmessage === 'function') {
+                try {
+                    const data = JSON.parse(event.data);
+                    this.onmessage(data);
+                } catch (e) {
+                    console.error('Error parsing message:', e);
+                }
+            }
+        });
+
+        channel.addEventListener('error', (error) => {
+            console.error('Data channel error:', error);
+        });
     }
 
     // create peer connection offer, used by peer initializing the communication
@@ -174,14 +203,23 @@ class P2P {
 
     // send a message to connected peers
     send(message) {
-        if (this.localPeerConnection === null) {
-            alert('P2P connection not open');
+        if (!this.dataChannel || this.dataChannel.readyState !== 'open') {
+            console.error('Data channel is not open. Current state:', this.dataChannel?.readyState);
+            return false;
         }
-        if (this.dataChannel !== null && this.dataChannel.readyState === 'open') {
-            this.dataChannel.send(typeof message === 'string' ? message : JSON.stringify(message));
-        } else {
-            console.log('data channel not initialized')
+
+        try {
+            const data = typeof message === 'string' ? message : JSON.stringify(message);
+            this.dataChannel.send(data);
+            return true;
+        } catch (error) {
+            console.error('Error sending message:', error);
+            return false;
         }
+    }
+
+    isDataChannelOpen() {
+        return this.dataChannel && this.dataChannel.readyState === 'open';
     }
 }
 

@@ -155,21 +155,22 @@
             // Function to process the typed command
             function processCommand() {
                 const command = inputBox.value;
+                inputBox.value = '';
                 
                 if (!isConnectionInitialized) {
                     output.textContent += `\n[Local] > ${command}`;
-                } else if (p2p.dataChannel && p2p.dataChannel.readyState === 'open') {
+                } else if (p2p.isDataChannelOpen()) {
                     output.textContent += `\n> ${command}`;
-                    try {
-                        p2p.dataChannel.send(JSON.stringify({ text: command }));
-                    } catch (error) {
-                        output.textContent += `\n[System] Failed to send message: ${error.message}`;
+                    if (p2p.send({ text: command })) {
+                        console.log('Message sent successfully');
+                    } else {
+                        output.textContent += `\n[System] Failed to send message`;
                     }
                 } else {
                     output.textContent += `\n[Not Connected] > ${command}`;
+                    console.log('Data channel state:', p2p.dataChannel?.readyState);
                 }
                 
-                inputBox.value = '';
                 scrollToBottom();
             }
 
@@ -255,8 +256,10 @@
 
             // Handle incoming P2P messages
             p2p.onmessage = (msg) => {
-                output.textContent += `\n${msg.text}`; // Show peer messages without prompt
-                scrollToBottom();
+                if (msg && msg.text) {
+                    output.textContent += `\n${msg.text}`; // Show peer messages without prompt
+                    scrollToBottom();
+                }
             };
         });
     </script>
