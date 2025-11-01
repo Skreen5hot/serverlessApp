@@ -1,6 +1,6 @@
 // peer to peer communication layer
-class P2P {
-    constructor() {
+const P2P = {
+    init() {
         // Connection settings
         this.signalingServerURL = 'wss://signal.filonexus.com';
         this.isInitiator = false;
@@ -68,7 +68,7 @@ class P2P {
         });
     }
 
-    initPeer() {
+    initPeer: function() {
         if (this.localPeerConnection) {
             this.localPeerConnection.close();
         }
@@ -173,7 +173,7 @@ class P2P {
         }
     }
 
-    async waitForDataChannel() {
+    waitForDataChannel: async function() {
         return new Promise((resolve, reject) => {
             // If channel is already open, resolve immediately
             if (this.dataChannel && this.dataChannel.readyState === 'open') {
@@ -240,7 +240,7 @@ class P2P {
         });
     }
 
-    setupDataChannelHandlers(channel) {
+    setupDataChannelHandlers: function(channel) {
         channel.onopen = () => {
             console.log('Data channel is open and ready to use');
             this.isConnected = true;
@@ -313,7 +313,7 @@ class P2P {
     }
 
     // create peer connection offer, used by peer initializing the communication
-    async createOffer() {
+    createOffer: async function() {
         try {
             if (this.localPeerConnection.signalingState !== 'stable') {
                 console.log('Cannot create offer - wrong state:', this.localPeerConnection.signalingState);
@@ -341,7 +341,7 @@ class P2P {
     }
 
     // accept incoming offer from remote peer, used by peer receiving the connection
-    async acceptOffer(sdp) {
+    acceptOffer: async function(sdp) {
         if (this.isInitiator) {
             console.log('Ignoring offer - we are the initiator');
             return;
@@ -396,7 +396,7 @@ class P2P {
     // after receiving peer accepted the offer, they get the answer SDP
     // this is used by initializing peer to accept the answer, after which
     // the peer to peer connection is ready
-    async acceptAnswer(sdp) {
+    acceptAnswer: async function(sdp) {
         if (!this.localPeerConnection || !this.isInitiator) {
             console.log('Not ready to accept answer');
             return;
@@ -430,7 +430,7 @@ class P2P {
     }
 
     // send a message to connected peers
-    send(message) {
+    send: function(message) {
         if (!this.dataChannel || this.dataChannel.readyState !== 'open') {
             console.error('Data channel is not open. Current state:', this.dataChannel?.readyState);
             return false;
@@ -446,11 +446,11 @@ class P2P {
         }
     }
 
-    isDataChannelOpen() {
+    isDataChannelOpen: function() {
         return this.dataChannel && this.dataChannel.readyState === 'open';
     }
 
-    async processPendingCandidates() {
+    processPendingCandidates: async function() {
         if (!this.localPeerConnection.remoteDescription) {
             console.log('Remote description not set, keeping candidates pending');
             return;
@@ -470,4 +470,5 @@ class P2P {
     }
 }
 
-var p2p = new P2P();
+// Export the P2P object
+window.P2P = P2P;

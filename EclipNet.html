@@ -136,7 +136,8 @@
     <script>
         document.addEventListener('DOMContentLoaded', () => {
             // Initialize P2P instance
-            const p2p = new P2P();
+            const p2p = Object.create(P2P);
+            p2p.init();
             
             const output = document.getElementById('output');
             const inputBox = document.getElementById('inputBox');
