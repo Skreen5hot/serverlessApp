@@ -41,13 +41,15 @@ class P2P {
             if (data.userId === this.userId) return;
             
             try {
-                if (this.localPeerConnection.remoteDescription) {
-                    await this.localPeerConnection.addIceCandidate(data.candidate);
+                const readyStates = ['have-remote-offer', 'have-local-pranswer', 'have-remote-pranswer', 'stable'];
+                if (this.localPeerConnection.remoteDescription && 
+                    readyStates.includes(this.localPeerConnection.signalingState)) {
+                    await this.localPeerConnection.addIceCandidate(new RTCIceCandidate(data.candidate));
                     console.log('Added ICE candidate');
                 } else {
                     // Store candidates until remote description is set
                     this.pendingCandidates.push(data.candidate);
-                    console.log('Stored pending ICE candidate');
+                    console.log('Stored pending ICE candidate, current state:', this.localPeerConnection.signalingState);
                 }
             } catch (e) {
                 console.warn('Error adding ICE candidate:', e);
@@ -66,7 +68,9 @@ class P2P {
                 { urls: 'stun:stun1.l.google.com:19302' }
             ],
             iceTransportPolicy: 'all',
-            iceCandidatePoolSize: 10
+            iceCandidatePoolSize: 10,
+            bundlePolicy: 'max-bundle',
+            rtcpMuxPolicy: 'require'
         };
 
         // Reset connection state
@@ -76,6 +80,23 @@ class P2P {
         
         // create peer connection
         this.localPeerConnection = new RTCPeerConnection(config);
+
+        // Add connection state change handlers
+        this.localPeerConnection.addEventListener('signalingstatechange', () => {
+            console.log('Signaling State:', this.localPeerConnection.signalingState);
+        });
+
+        this.localPeerConnection.addEventListener('connectionstatechange', () => {
+            console.log('Connection State:', this.localPeerConnection.connectionState);
+        });
+
+        this.localPeerConnection.addEventListener('iceconnectionstatechange', () => {
+            console.log('ICE Connection State:', this.localPeerConnection.iceConnectionState);
+        });
+
+        this.localPeerConnection.addEventListener('icegatheringstatechange', () => {
+            console.log('ICE Gathering State:', this.localPeerConnection.iceGatheringState);
+        });
 
         // Handle incoming data channels
         this.localPeerConnection.addEventListener('datachannel', (event) => {
@@ -106,27 +127,47 @@ class P2P {
         channel.addEventListener('open', () => {
             console.log('Data channel is open and ready to use');
             this.isConnected = true;
+            this.dataChannel = channel;
+            
+            // Send a test message to verify the channel
+            try {
+                channel.send(JSON.stringify({ type: 'ping' }));
+                console.log('Sent test ping message');
+            } catch (e) {
+                console.error('Error sending test message:', e);
+            }
         });
 
         channel.addEventListener('close', () => {
             console.log('Data channel closed');
             this.isConnected = false;
+            if (this.dataChannel === channel) {
+                this.dataChannel = null;
+            }
         });
 
         channel.addEventListener('message', (event) => {
-            console.log('Received message:', event.data);
-            if (typeof this.onmessage === 'function') {
-                try {
-                    const data = JSON.parse(event.data);
-                    this.onmessage(data);
-                } catch (e) {
-                    console.error('Error parsing message:', e);
+            console.log('Received message on data channel:', event.data);
+            try {
+                const data = JSON.parse(event.data);
+                if (data.type === 'ping') {
+                    channel.send(JSON.stringify({ type: 'pong' }));
+                    return;
                 }
+                if (typeof this.onmessage === 'function') {
+                    this.onmessage(data);
+                }
+            } catch (e) {
+                console.error('Error handling message:', e);
             }
         });
 
         channel.addEventListener('error', (error) => {
             console.error('Data channel error:', error);
+            this.isConnected = false;
+            if (this.dataChannel === channel) {
+                this.dataChannel = null;
+            }
         });
     }
 
@@ -215,19 +256,32 @@ class P2P {
     // this is used by initializing peer to accept the answer, after which
     // the peer to peer connection is ready
     async acceptAnswer(sdp) {
-        if (this.localPeerConnection === null) {return;}
+        if (!this.localPeerConnection || !this.isInitiator) {
+            console.log('Not ready to accept answer');
+            return;
+        }
         
         try {
-            // Only proceed if we're in the right state
             if (this.localPeerConnection.signalingState === 'have-local-offer') {
                 const answer = new RTCSessionDescription({
                     type: 'answer',
-                    sdp: `${sdp}`
+                    sdp: sdp
                 });
                 await this.localPeerConnection.setRemoteDescription(answer);
-                console.log('answer accepted');
+                console.log('Answer accepted, processing pending candidates');
+                
+                // Process any pending ICE candidates
+                while (this.pendingCandidates.length) {
+                    const candidate = this.pendingCandidates.shift();
+                    try {
+                        await this.localPeerConnection.addIceCandidate(new RTCIceCandidate(candidate));
+                        console.log('Added pending ICE candidate after answer');
+                    } catch (e) {
+                        console.warn('Error adding pending candidate after answer:', e);
+                    }
+                }
             } else {
-                console.log('Ignoring answer - wrong state:', this.localPeerConnection.signalingState);
+                console.log('Cannot accept answer - wrong state:', this.localPeerConnection.signalingState);
             }
         } catch (error) {
             console.error('Error accepting answer:', error);
