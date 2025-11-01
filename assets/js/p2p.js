@@ -134,12 +134,22 @@ class P2P {
     // the peer to peer connection is ready
     async acceptAnswer(sdp) {
         if (this.localPeerConnection === null) {return;}
-        const offer = new RTCSessionDescription({
-            type: 'answer',
-            sdp: `${sdp}`
-        });
-        this.localPeerConnection.setRemoteDescription(offer);
-        console.log('answer accepted');
+        
+        try {
+            // Only proceed if we're in the right state
+            if (this.localPeerConnection.signalingState === 'have-local-offer') {
+                const answer = new RTCSessionDescription({
+                    type: 'answer',
+                    sdp: `${sdp}`
+                });
+                await this.localPeerConnection.setRemoteDescription(answer);
+                console.log('answer accepted');
+            } else {
+                console.log('Ignoring answer - wrong state:', this.localPeerConnection.signalingState);
+            }
+        } catch (error) {
+            console.error('Error accepting answer:', error);
+        }
     }
 
     // send a message to connected peers

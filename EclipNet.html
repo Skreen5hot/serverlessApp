@@ -155,14 +155,13 @@
             // Function to process the typed command
             function processCommand() {
                 const command = inputBox.value;
-                output.textContent += `\n> ${command}`;
                 
                 // Send message through P2P if connection is established
                 if (p2p.dataChannel && p2p.dataChannel.readyState === 'open') {
                     p2p.dataChannel.send(JSON.stringify({ text: command }));
-                    output.textContent += `\nMessage sent: ${command}\n`;
+                    output.textContent += `\n> ${command}`; // Only show the command with prompt
                 } else {
-                    output.textContent += `\n${command}\n`;
+                    output.textContent += `\n[Not Connected] > ${command}`;
                 }
                 
                 inputBox.value = '';
@@ -214,17 +213,28 @@
             p2pInitButton.addEventListener('click', async () => {
                 try {
                     await p2p.createOffer();
-                    output.textContent += '\nP2P Connection Initialized. Waiting for peer...\n';
+                    output.textContent += '\n[System] P2P Connection Initialized. Waiting for peer...\n';
                     scrollToBottom();
+
+                    // Add event listeners for connection state changes
+                    p2p.dataChannel.addEventListener('open', () => {
+                        output.textContent += '\n[System] Connected to peer!\n';
+                        scrollToBottom();
+                    });
+
+                    p2p.dataChannel.addEventListener('close', () => {
+                        output.textContent += '\n[System] Connection closed\n';
+                        scrollToBottom();
+                    });
                 } catch (error) {
-                    output.textContent += '\nError initializing P2P connection: ' + error.message + '\n';
+                    output.textContent += '\n[System] Error: ' + error.message + '\n';
                     scrollToBottom();
                 }
             });
 
             // Handle incoming P2P messages
             p2p.onmessage = (msg) => {
-                output.textContent += `\nReceived: ${msg.text}\n`;
+                output.textContent += `\n${msg.text}`; // Show peer messages without prompt
                 scrollToBottom();
             };
         });
