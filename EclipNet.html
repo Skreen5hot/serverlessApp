@@ -231,6 +231,7 @@
                     
                     output.textContent += '\n[System] Initializing connection...\n';
                     
+                    // Monitor connection states
                     p2p.localPeerConnection.addEventListener('connectionstatechange', () => {
                         const state = p2p.localPeerConnection.connectionState;
                         output.textContent += `\n[System] Connection state: ${state}\n`;
@@ -243,8 +244,23 @@
                         scrollToBottom();
                     });
 
+                    // Monitor data channel state
+                    const monitorDataChannel = () => {
+                        if (p2p.dataChannel) {
+                            output.textContent += `\n[System] Data channel state: ${p2p.dataChannel.readyState}\n`;
+                            scrollToBottom();
+                        }
+                    };
+
+                    setInterval(monitorDataChannel, 1000);
+
                     await p2p.createOffer();
                     output.textContent += '\n[System] Offer sent. Waiting for peer...\n';
+                    scrollToBottom();
+
+                    // Wait for data channel to open
+                    await p2p.waitForDataChannel();
+                    output.textContent += '\n[System] Data channel established!\n';
                     scrollToBottom();
 
                 } catch (error) {

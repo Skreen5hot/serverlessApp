@@ -100,9 +100,21 @@ class P2P {
 
         // Handle incoming data channels
         this.localPeerConnection.addEventListener('datachannel', (event) => {
-            console.log('Received data channel');
+            console.log('Received remote data channel');
             this.dataChannel = event.channel;
             this.setupDataChannelHandlers(this.dataChannel);
+        });
+
+        // Handle negotiation needed
+        this.localPeerConnection.addEventListener('negotiationneeded', async () => {
+            console.log('Negotiation needed event fired');
+            if (this.isInitiator) {
+                try {
+                    await this.createOffer();
+                } catch (e) {
+                    console.error('Error during negotiation:', e);
+                }
+            }
         });
 
         // received ICE candidate for local peer, send to signaling server to broadcast
@@ -117,17 +129,35 @@ class P2P {
 
         // create data channel for the initiator
         if (!this.dataChannel) {
-            this.dataChannel = this.localPeerConnection.createDataChannel('messages');
-            console.log('Created data channel');
+            this.dataChannel = this.localPeerConnection.createDataChannel('messages', {
+                ordered: true,
+                negotiated: false,
+                id: null
+            });
+            console.log('Created local data channel');
             this.setupDataChannelHandlers(this.dataChannel);
         }
     }
 
+    async waitForDataChannel() {
+        return new Promise((resolve) => {
+            if (this.dataChannel && this.dataChannel.readyState === 'open') {
+                resolve();
+            } else {
+                const checkInterval = setInterval(() => {
+                    if (this.dataChannel && this.dataChannel.readyState === 'open') {
+                        clearInterval(checkInterval);
+                        resolve();
+                    }
+                }, 100);
+            }
+        });
+    }
+
     setupDataChannelHandlers(channel) {
-        channel.addEventListener('open', () => {
+        channel.onopen = () => {
             console.log('Data channel is open and ready to use');
             this.isConnected = true;
-            this.dataChannel = channel;
             
             // Send a test message to verify the channel
             try {
@@ -136,22 +166,27 @@ class P2P {
             } catch (e) {
                 console.error('Error sending test message:', e);
             }
-        });
+        };
 
-        channel.addEventListener('close', () => {
+        channel.onclose = () => {
             console.log('Data channel closed');
             this.isConnected = false;
             if (this.dataChannel === channel) {
                 this.dataChannel = null;
             }
-        });
+        };
 
-        channel.addEventListener('message', (event) => {
+        channel.onmessage = (event) => {
             console.log('Received message on data channel:', event.data);
             try {
                 const data = JSON.parse(event.data);
                 if (data.type === 'ping') {
+                    console.log('Received ping, sending pong');
                     channel.send(JSON.stringify({ type: 'pong' }));
+                    return;
+                }
+                if (data.type === 'pong') {
+                    console.log('Received pong - channel verified');
                     return;
                 }
                 if (typeof this.onmessage === 'function') {
@@ -160,15 +195,15 @@ class P2P {
             } catch (e) {
                 console.error('Error handling message:', e);
             }
-        });
+        };
 
-        channel.addEventListener('error', (error) => {
+        channel.onerror = (error) => {
             console.error('Data channel error:', error);
             this.isConnected = false;
             if (this.dataChannel === channel) {
                 this.dataChannel = null;
             }
-        });
+        };
     }
 
     // create peer connection offer, used by peer initializing the communication
