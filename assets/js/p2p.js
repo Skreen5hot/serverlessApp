@@ -1,24 +1,35 @@
 // peer to peer communication layer
 class P2P {
     constructor() {
+        // Connection settings
         this.signalingServerURL = 'wss://signal.filonexus.com';
+        this.isInitiator = false;
+        
+        // WebRTC state
         this.localPeerConnection = null;
         this.dataChannel = null;
-        this.isInitiator = false;
-        this.isConnected = false;
         this.pendingCandidates = [];
+        
+        // Connection state flags
+        this.isConnected = false;
+        this.channelReady = false;
+        this.isNegotiating = false;
+        
+        // Event handlers
+        this.onmessage = null;
+        this.onchannelopen = null;
+        this.onchannelclose = null;
+        this.onconnectionstatechange = null;
+        
+        // Setup socket connection
         this.socket = new io(this.signalingServerURL);
         
         // Generate a unique user ID
         this.userId = Math.random().toString(36).substr(2, 9);
         
-        this.onmessage = null;
-        
         this.socket.on('connect', () => {
             console.log('Connected to signaling server with ID:', this.userId);
         });
-
-        this.initPeer();
 
         // offer received from signaling server, accept and send answer
         this.socket.on('receive-offer', async (data) => {
@@ -86,6 +97,27 @@ class P2P {
         this.localPeerConnection.addEventListener('signalingstatechange', () => {
             console.log('Signaling State:', this.localPeerConnection.signalingState);
         });
+        
+        this.localPeerConnection.addEventListener('connectionstatechange', () => {
+            const state = this.localPeerConnection.connectionState;
+            console.log('Connection state changed:', state);
+            
+            if (typeof this.onconnectionstatechange === 'function') {
+                this.onconnectionstatechange(state);
+            }
+            
+            if (state === 'connected') {
+                this.isConnected = true;
+                // Process any pending ICE candidates
+                if (this.pendingCandidates.length > 0) {
+                    this.processPendingCandidates();
+                }
+            } else if (state === 'disconnected' || state === 'failed' || state === 'closed') {
+                this.isConnected = false;
+                this.channelReady = false;
+                this.dataChannel = null;
+            }
+        });
 
         this.localPeerConnection.addEventListener('connectionstatechange', () => {
             console.log('Connection State:', this.localPeerConnection.connectionState);
@@ -118,14 +150,27 @@ class P2P {
             }
         });
 
+        // Setup handlers for data channel creation and connection state changes
+        this.localPeerConnection.ondatachannel = (event) => {
+            console.log('Remote data channel created');
+            this.dataChannel = event.channel;
+            this.setupDataChannelHandlers(this.dataChannel);
+        };
+
         // Only create data channel if we're the initiator
         if (this.isInitiator && !this.dataChannel) {
             const dataChannelConfig = {
-                ordered: true
+                ordered: true,
+                maxRetransmits: 3,  // Allow up to 3 retransmission attempts
+                protocol: 'json'    // Indicate we're sending JSON data
             };
-            this.dataChannel = this.localPeerConnection.createDataChannel('messages', dataChannelConfig);
-            console.log('Created local data channel');
-            this.setupDataChannelHandlers(this.dataChannel);
+            try {
+                this.dataChannel = this.localPeerConnection.createDataChannel('messages', dataChannelConfig);
+                console.log('Created local data channel');
+                this.setupDataChannelHandlers(this.dataChannel);
+            } catch (e) {
+                console.error('Error creating data channel:', e);
+            }
         }
     }
 
@@ -161,37 +206,39 @@ class P2P {
         channel.onopen = () => {
             console.log('Data channel is open and ready to use');
             this.isConnected = true;
+            this.channelReady = true;
             
-            // Send a test message to verify the channel
-            try {
-                channel.send(JSON.stringify({ type: 'ping' }));
-                console.log('Sent test ping message');
-            } catch (e) {
-                console.error('Error sending test message:', e);
+            if (typeof this.onchannelopen === 'function') {
+                this.onchannelopen();
+            }
+
+            // If we're the initiator, send a channel verification message
+            if (this.isInitiator) {
+                this.sendVerification();
             }
         };
 
         channel.onclose = () => {
             console.log('Data channel closed');
             this.isConnected = false;
-            if (this.dataChannel === channel) {
-                this.dataChannel = null;
+            this.channelReady = false;
+            this.dataChannel = null;
+            
+            if (typeof this.onchannelclose === 'function') {
+                this.onchannelclose();
             }
         };
 
         channel.onmessage = (event) => {
-            console.log('Received message on data channel:', event.data);
             try {
                 const data = JSON.parse(event.data);
-                if (data.type === 'ping') {
-                    console.log('Received ping, sending pong');
-                    channel.send(JSON.stringify({ type: 'pong' }));
+                console.log('Received message:', data);
+                
+                if (data.type === 'verify-channel') {
+                    this.handleVerification(data);
                     return;
                 }
-                if (data.type === 'pong') {
-                    console.log('Received pong - channel verified');
-                    return;
-                }
+                
                 if (typeof this.onmessage === 'function') {
                     this.onmessage(data);
                 }
@@ -203,10 +250,28 @@ class P2P {
         channel.onerror = (error) => {
             console.error('Data channel error:', error);
             this.isConnected = false;
-            if (this.dataChannel === channel) {
-                this.dataChannel = null;
-            }
+            this.channelReady = false;
+            this.dataChannel = null;
         };
+    }
+
+    sendVerification() {
+        if (this.dataChannel && this.dataChannel.readyState === 'open') {
+            const verifyMsg = {
+                type: 'verify-channel',
+                role: this.isInitiator ? 'initiator' : 'receiver',
+                timestamp: Date.now()
+            };
+            this.dataChannel.send(JSON.stringify(verifyMsg));
+        }
+    }
+
+    handleVerification(data) {
+        console.log('Channel verification:', data);
+        if (!this.isInitiator && data.role === 'initiator') {
+            this.sendVerification();
+        }
+    }
     }
 
     // create peer connection offer, used by peer initializing the communication
@@ -345,6 +410,25 @@ class P2P {
 
     isDataChannelOpen() {
         return this.dataChannel && this.dataChannel.readyState === 'open';
+    }
+
+    async processPendingCandidates() {
+        if (!this.localPeerConnection.remoteDescription) {
+            console.log('Remote description not set, keeping candidates pending');
+            return;
+        }
+
+        while (this.pendingCandidates.length > 0) {
+            const candidate = this.pendingCandidates.shift();
+            try {
+                await this.localPeerConnection.addIceCandidate(new RTCIceCandidate(candidate));
+                console.log('Added pending ICE candidate');
+            } catch (e) {
+                console.warn('Error adding pending ICE candidate:', e);
+                this.pendingCandidates.unshift(candidate);
+                break;
+            }
+        }
     }
 }
 
